@@ -9,9 +9,42 @@
 /* Begin PBXBuildFile section */
 		BA54CBBF2F03506200E56C58 /* WillpowerKit in Frameworks */ = {isa = PBXBuildFile; productRef = BA54CBBE2F03506200E56C58 /* WillpowerKit */; };
 		BA54CBC12F03507000E56C58 /* WillpowerKit in Frameworks */ = {isa = PBXBuildFile; productRef = BA54CBC02F03507000E56C58 /* WillpowerKit */; };
+		BA54CBFA2F03AB8600E56C58 /* WillpowerDaemon in Copy Daemon Binary */ = {isa = PBXBuildFile; fileRef = BA68A52F2F03466D00112297 /* WillpowerDaemon */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		BA54CBFF2F03ABEF00E56C58 /* ServiceManagement.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BA54CBFE2F03ABEF00E56C58 /* ServiceManagement.framework */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		BA54CBF72F03AB5000E56C58 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = BA68A5132F03461E00112297 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = BA68A52E2F03466D00112297;
+			remoteInfo = WillpowerDaemon;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXCopyFilesBuildPhase section */
+		BA54CBF92F03AB5D00E56C58 /* Copy Daemon Binary */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 6;
+			files = (
+				BA54CBFA2F03AB8600E56C58 /* WillpowerDaemon in Copy Daemon Binary */,
+			);
+			name = "Copy Daemon Binary";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BA54CBFB2F03ABA700E56C58 /* Copy Daemon Plist */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = Contents/Library/LaunchDaemons;
+			dstSubfolderSpec = 1;
+			files = (
+			);
+			name = "Copy Daemon Plist";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		BA68A52D2F03466D00112297 /* CopyFiles */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
@@ -25,9 +58,20 @@
 
 /* Begin PBXFileReference section */
 		BA54CBBD2F03503700E56C58 /* WillpowerKit */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = WillpowerKit; sourceTree = "<group>"; };
+		BA54CBFE2F03ABEF00E56C58 /* ServiceManagement.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ServiceManagement.framework; path = System/Library/Frameworks/ServiceManagement.framework; sourceTree = SDKROOT; };
 		BA68A51B2F03461E00112297 /* Willpower.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Willpower.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		BA68A52F2F03466D00112297 /* WillpowerDaemon */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = WillpowerDaemon; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
+		BA54CBFD2F03ABD300E56C58 /* Exceptions for "WillpowerDaemon" folder in "Copy Daemon Plist" phase from "Willpower" target */ = {
+			isa = PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet;
+			buildPhase = BA54CBFB2F03ABA700E56C58 /* Copy Daemon Plist */;
+			membershipExceptions = (
+				raviriley.WillpowerDaemon.plist,
+			);
+		};
+/* End PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		BA68A51D2F03461E00112297 /* Willpower */ = {
@@ -37,6 +81,9 @@
 		};
 		BA68A5302F03466E00112297 /* WillpowerDaemon */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				BA54CBFD2F03ABD300E56C58 /* Exceptions for "WillpowerDaemon" folder in "Copy Daemon Plist" phase from "Willpower" target */,
+			);
 			path = WillpowerDaemon;
 			sourceTree = "<group>";
 		};
@@ -48,6 +95,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				BA54CBBF2F03506200E56C58 /* WillpowerKit in Frameworks */,
+				BA54CBFF2F03ABEF00E56C58 /* ServiceManagement.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -85,6 +133,7 @@
 		BA68A5372F03473200112297 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				BA54CBFE2F03ABEF00E56C58 /* ServiceManagement.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -99,10 +148,13 @@
 				BA68A5172F03461E00112297 /* Sources */,
 				BA68A5182F03461E00112297 /* Frameworks */,
 				BA68A5192F03461E00112297 /* Resources */,
+				BA54CBF92F03AB5D00E56C58 /* Copy Daemon Binary */,
+				BA54CBFB2F03ABA700E56C58 /* Copy Daemon Plist */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				BA54CBF82F03AB5000E56C58 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				BA68A51D2F03461E00112297 /* Willpower */,
@@ -202,6 +254,14 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		BA54CBF82F03AB5000E56C58 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = BA68A52E2F03466D00112297 /* WillpowerDaemon */;
+			targetProxy = BA54CBF72F03AB5000E56C58 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		BA68A5262F03462000112297 /* Debug */ = {
@@ -330,14 +390,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Willpower/Willpower.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = P5AM8FWTFW;
-				ENABLE_APP_SANDBOX = YES;
+				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
-				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -347,6 +407,7 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = raviriley.Willpower;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -363,14 +424,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Willpower/Willpower.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = P5AM8FWTFW;
-				ENABLE_APP_SANDBOX = YES;
+				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
-				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -380,6 +441,7 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = raviriley.Willpower;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -396,6 +458,7 @@
 				AUTOMATION_APPLE_EVENTS = NO;
 				CODE_SIGN_ENTITLEMENTS = WillpowerDaemon/WillpowerDaemon.entitlements;
 				CODE_SIGN_STYLE = Automatic;
+				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
 				DEVELOPMENT_TEAM = P5AM8FWTFW;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
@@ -404,6 +467,7 @@
 				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
 				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
 				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
+				INFOPLIST_FILE = WillpowerDaemon/Info.plist;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				RUNTIME_EXCEPTION_ALLOW_DYLD_ENVIRONMENT_VARIABLES = NO;
 				RUNTIME_EXCEPTION_ALLOW_JIT = NO;
@@ -411,6 +475,7 @@
 				RUNTIME_EXCEPTION_DEBUGGING_TOOL = NO;
 				RUNTIME_EXCEPTION_DISABLE_EXECUTABLE_PAGE_PROTECTION = NO;
 				RUNTIME_EXCEPTION_DISABLE_LIBRARY_VALIDATION = NO;
+				SKIP_INSTALL = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
@@ -423,6 +488,7 @@
 				AUTOMATION_APPLE_EVENTS = NO;
 				CODE_SIGN_ENTITLEMENTS = WillpowerDaemon/WillpowerDaemon.entitlements;
 				CODE_SIGN_STYLE = Automatic;
+				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
 				DEVELOPMENT_TEAM = P5AM8FWTFW;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
@@ -431,6 +497,7 @@
 				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
 				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
 				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
+				INFOPLIST_FILE = WillpowerDaemon/Info.plist;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				RUNTIME_EXCEPTION_ALLOW_DYLD_ENVIRONMENT_VARIABLES = NO;
 				RUNTIME_EXCEPTION_ALLOW_JIT = NO;
@@ -438,6 +505,7 @@
 				RUNTIME_EXCEPTION_DEBUGGING_TOOL = NO;
 				RUNTIME_EXCEPTION_DISABLE_EXECUTABLE_PAGE_PROTECTION = NO;
 				RUNTIME_EXCEPTION_DISABLE_LIBRARY_VALIDATION = NO;
+				SKIP_INSTALL = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;

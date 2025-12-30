@@ -6,27 +6,39 @@
 //
 
 import SwiftUI
-import SwiftData
+import WillpowerKit
 
 @main
 struct WillpowerApp: App {
-    var sharedModelContainer: ModelContainer = {
-        let schema = Schema([
-            Item.self,
-        ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-
-        do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
-        } catch {
-            fatalError("Could not create ModelContainer: \(error)")
-        }
-    }()
+    @State private var viewModel = WillpowerViewModel()
+    @State private var daemonManager = DaemonManager()
+    @State private var showDaemonSetup = false
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            ContentView(viewModel: viewModel)
+                .environment(daemonManager)
+                .onAppear {
+                    viewModel.startStateSync()
+                    checkDaemonStatus()
+                }
+                .onDisappear {
+                    viewModel.stopStateSync()
+                }
+                .sheet(isPresented: $showDaemonSetup) {
+                    DaemonSetupView(daemonManager: daemonManager)
+                }
         }
-        .modelContainer(sharedModelContainer)
+        .windowStyle(.automatic)
+        .defaultSize(width: 1000, height: 700)
+    }
+
+    private func checkDaemonStatus() {
+        daemonManager.refreshStatus()
+
+        // Show setup if daemon is not fully enabled
+        if !daemonManager.isEnabled {
+            showDaemonSetup = true
+        }
     }
 }
