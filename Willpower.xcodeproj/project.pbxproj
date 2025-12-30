@@ -6,14 +6,38 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		BA54CBBF2F03506200E56C58 /* WillpowerKit in Frameworks */ = {isa = PBXBuildFile; productRef = BA54CBBE2F03506200E56C58 /* WillpowerKit */; };
+		BA54CBC12F03507000E56C58 /* WillpowerKit in Frameworks */ = {isa = PBXBuildFile; productRef = BA54CBC02F03507000E56C58 /* WillpowerKit */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		BA68A52D2F03466D00112297 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = /usr/share/man/man1/;
+			dstSubfolderSpec = 0;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 1;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		BA54CBBD2F03503700E56C58 /* WillpowerKit */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = WillpowerKit; sourceTree = "<group>"; };
 		BA68A51B2F03461E00112297 /* Willpower.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Willpower.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		BA68A52F2F03466D00112297 /* WillpowerDaemon */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = WillpowerDaemon; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		BA68A51D2F03461E00112297 /* Willpower */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = Willpower;
+			sourceTree = "<group>";
+		};
+		BA68A5302F03466E00112297 /* WillpowerDaemon */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = WillpowerDaemon;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -23,6 +47,15 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BA54CBBF2F03506200E56C58 /* WillpowerKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BA68A52C2F03466D00112297 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BA54CBC12F03507000E56C58 /* WillpowerKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -32,7 +65,10 @@
 		BA68A5122F03461E00112297 = {
 			isa = PBXGroup;
 			children = (
+				BA54CBBD2F03503700E56C58 /* WillpowerKit */,
 				BA68A51D2F03461E00112297 /* Willpower */,
+				BA68A5302F03466E00112297 /* WillpowerDaemon */,
+				BA68A5372F03473200112297 /* Frameworks */,
 				BA68A51C2F03461E00112297 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -41,8 +77,16 @@
 			isa = PBXGroup;
 			children = (
 				BA68A51B2F03461E00112297 /* Willpower.app */,
+				BA68A52F2F03466D00112297 /* WillpowerDaemon */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		BA68A5372F03473200112297 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -65,10 +109,34 @@
 			);
 			name = Willpower;
 			packageProductDependencies = (
+				BA54CBBE2F03506200E56C58 /* WillpowerKit */,
 			);
 			productName = Willpower;
 			productReference = BA68A51B2F03461E00112297 /* Willpower.app */;
 			productType = "com.apple.product-type.application";
+		};
+		BA68A52E2F03466D00112297 /* WillpowerDaemon */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = BA68A5332F03466E00112297 /* Build configuration list for PBXNativeTarget "WillpowerDaemon" */;
+			buildPhases = (
+				BA68A52B2F03466D00112297 /* Sources */,
+				BA68A52C2F03466D00112297 /* Frameworks */,
+				BA68A52D2F03466D00112297 /* CopyFiles */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				BA68A5302F03466E00112297 /* WillpowerDaemon */,
+			);
+			name = WillpowerDaemon;
+			packageProductDependencies = (
+				BA54CBC02F03507000E56C58 /* WillpowerKit */,
+			);
+			productName = WillpowerDaemon;
+			productReference = BA68A52F2F03466D00112297 /* WillpowerDaemon */;
+			productType = "com.apple.product-type.tool";
 		};
 /* End PBXNativeTarget section */
 
@@ -81,6 +149,9 @@
 				LastUpgradeCheck = 2620;
 				TargetAttributes = {
 					BA68A51A2F03461E00112297 = {
+						CreatedOnToolsVersion = 26.2;
+					};
+					BA68A52E2F03466D00112297 = {
 						CreatedOnToolsVersion = 26.2;
 					};
 				};
@@ -100,6 +171,7 @@
 			projectRoot = "";
 			targets = (
 				BA68A51A2F03461E00112297 /* Willpower */,
+				BA68A52E2F03466D00112297 /* WillpowerDaemon */,
 			);
 		};
 /* End PBXProject section */
@@ -116,6 +188,13 @@
 
 /* Begin PBXSourcesBuildPhase section */
 		BA68A5172F03461E00112297 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BA68A52B2F03466D00112297 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -309,6 +388,58 @@
 			};
 			name = Release;
 		};
+		BA68A5342F03466E00112297 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				AUTOMATION_APPLE_EVENTS = NO;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = P5AM8FWTFW;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
+				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
+				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
+				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
+				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
+				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				RUNTIME_EXCEPTION_ALLOW_DYLD_ENVIRONMENT_VARIABLES = NO;
+				RUNTIME_EXCEPTION_ALLOW_JIT = NO;
+				RUNTIME_EXCEPTION_ALLOW_UNSIGNED_EXECUTABLE_MEMORY = YES;
+				RUNTIME_EXCEPTION_DEBUGGING_TOOL = NO;
+				RUNTIME_EXCEPTION_DISABLE_EXECUTABLE_PAGE_PROTECTION = NO;
+				RUNTIME_EXCEPTION_DISABLE_LIBRARY_VALIDATION = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		BA68A5352F03466E00112297 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				AUTOMATION_APPLE_EVENTS = NO;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = P5AM8FWTFW;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
+				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
+				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
+				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
+				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
+				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				RUNTIME_EXCEPTION_ALLOW_DYLD_ENVIRONMENT_VARIABLES = NO;
+				RUNTIME_EXCEPTION_ALLOW_JIT = NO;
+				RUNTIME_EXCEPTION_ALLOW_UNSIGNED_EXECUTABLE_MEMORY = YES;
+				RUNTIME_EXCEPTION_DEBUGGING_TOOL = NO;
+				RUNTIME_EXCEPTION_DISABLE_EXECUTABLE_PAGE_PROTECTION = NO;
+				RUNTIME_EXCEPTION_DISABLE_LIBRARY_VALIDATION = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -330,7 +461,27 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		BA68A5332F03466E00112297 /* Build configuration list for PBXNativeTarget "WillpowerDaemon" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BA68A5342F03466E00112297 /* Debug */,
+				BA68A5352F03466E00112297 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		BA54CBBE2F03506200E56C58 /* WillpowerKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = WillpowerKit;
+		};
+		BA54CBC02F03507000E56C58 /* WillpowerKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = WillpowerKit;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = BA68A5132F03461E00112297 /* Project object */;
 }
