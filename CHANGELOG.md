@@ -137,40 +137,328 @@ WillpowerKit/
 
 ## TODOs
 
-### High Priority
+TODOs are organized into two phases:
+- **Phase 1 (NOW)**: Core functionality, UX polish, making the app great
+- **Phase 2 (LATER)**: Distribution, production infrastructure, post-launch features
 
-- [ ] **Enable/disable toggle for schedules and triggers** - Currently toggles are disabled with TODO comment
-- [ ] **Settings view implementation** - Settings category exists in sidebar but view is placeholder
-- [ ] **Error handling UI improvements** - Show more specific error messages for daemon communication failures
-- [ ] **Persist daemon status across app launches** - Currently requires manual re-registration if daemon stops
+---
 
-### Medium Priority
+## Phase 1: NOW - Core Features & Polish
 
-- [ ] **Overnight schedule windows** - Test and validate schedules spanning midnight (e.g., 22:00-06:00)
-- [ ] **Browser monitor accuracy** - Current polling may miss rapid page navigation
-- [ ] **Visit count persistence** - Visit records should survive daemon restarts
-- [ ] **Multiple schedules per blocklist** - UI supports this but needs testing
-- [ ] **Blocklist import/export** - Allow users to share blocklist configurations
-- [ ] **Menu bar quick actions** - Mini status and quick activation from menu bar
+### 1.1 Critical Functionality
 
-### Low Priority / Future Features
+#### Permissions & Setup
+- [ ] **Accessibility permission for BrowserMonitor** - Required for visit-count triggers:
+  - Add `NSAppleEventsUsageDescription` to Info.plist
+  - Check permission status on app launch with `AXIsProcessTrusted()`
+  - If not granted, show setup guide (not a dismissible prompt)
+  - **NO "Later" or "Skip" buttons** - user must grant or visit-count triggers are disabled
+  - Deep link to System Settings > Privacy & Security > Accessibility
+  - Gracefully degrade: if denied, hide/disable visit-count trigger UI entirely
 
-- [ ] **App Sandbox compliance** - Currently requires disabling sandbox for /tmp access
-- [ ] **Code signing for distribution** - Proper signing for LaunchDaemon installation
+- [ ] **Automation permission for AppleScript** - Required for browser URL polling:
+  - Add `NSAppleEventsUsageDescription` with clear explanation
+  - Request permission for Safari, Chrome, Arc, etc.
+  - Handle per-browser permission grants
+
+#### Enable/Disable Toggles
+- [ ] **Implement schedule/trigger enable toggle** - Currently disabled with TODO:
+  - Add `toggleTriggerEnabled(triggerId:in:)` to ViewModel
+  - Send IPC command to daemon to update state
+  - UI: grayed out row with "Disabled" badge when `isEnabled: false`
+  - Disabled triggers should not activate blocks
+
+### 1.2 UI/UX Polish
+
+#### Performance
+- [ ] **Fix 5-second UI update lag** - Changes should appear instantly:
+  - Current: ViewModel polls daemon state every 2 seconds
+  - After user action (create/edit/delete), force immediate sync
+  - Add `syncState()` call after all mutation methods
+  - Consider optimistic UI updates (update local state immediately, sync confirms)
+
+- [ ] **Reduce daemon evaluation interval** - Currently 5 seconds:
+  - For schedules: 5 seconds is acceptable
+  - For visit-count: Consider 1-2 seconds for more responsive blocking
+  - Make configurable in daemon plist
+
+#### Onboarding Flow
+- [ ] **First-launch onboarding** - Guide user through setup:
+  - Step 1: Welcome screen explaining what Willpower does
+  - Step 2: Daemon installation (SMAppService approval in System Settings)
+  - Step 3: Accessibility permission (required, no skip)
+  - Step 4: Create first blocklist (guided)
+  - **NO "Later" buttons** - each step must be completed or explicitly declined with consequences shown
+  - Store onboarding completion state in UserDefaults
+
+- [ ] **Permission status dashboard** - Show in Settings:
+  - Daemon: Installed / Not Installed
+  - Accessibility: Granted / Not Granted (with "Fix" button)
+  - Each browser automation permission status
+
+#### Settings View
+- [ ] **Implement Settings view** - Currently placeholder:
+  - **Status Section** (read-only, no controls):
+    - Daemon status indicator ("Protected" / "Not Running")
+    - **Hide all daemon start/stop controls** - daemon is invisible
+    - Only show "Reinstall Daemon" as last resort troubleshooting option
+  - **Permissions Section**:
+    - Accessibility permission status + grant button
+    - Browser automation permissions
+  - **Preferences Section**:
+    - Launch at login toggle (SMAppService.loginItem)
+    - Notification preferences (block start/end)
+  - **Data Section**:
+    - Export blocklists (JSON)
+    - Import blocklists
+    - Reset all data (with confirmation, blocked if any locked blocks active)
+  - **About Section**:
+    - App version
+    - Daemon version
+    - Links to support/feedback
+
+#### Visual Design
+- [ ] **App icon** - Replace default SwiftUI app icon
+- [ ] **Color scheme refinement** - Consistent use of:
+  - Green: active/protected
+  - Orange: warning/pending
+  - Red: blocked/error
+  - Gray: disabled/inactive
+
+- [ ] **Empty states** - Improve empty state views:
+  - Blocklists: Show benefit of creating first blocklist
+  - Schedules: Explain automation value
+  - Triggers: Explain visit-count concept
+
+- [ ] **Loading states** - Show activity during:
+  - Daemon communication
+  - Blocklist activation
+  - Permission checks
+
+#### Interaction Polish
+- [ ] **Confirmation dialogs** - Add for destructive actions:
+  - Delete blocklist (especially if has triggers)
+  - Reset all data
+  - Deactivate unlocked block
+
+- [ ] **Success feedback** - Visual confirmation when:
+  - Blocklist created/updated
+  - Block activated
+  - Schedule saved
+
+- [ ] **Error messages** - User-friendly errors:
+  - "Daemon not running" → "Blocking is paused. Open Settings to reinstall."
+  - Connection errors → "Reconnecting..." with retry
+
+### 1.3 Core Feature Completion
+
+#### Schedule Improvements
+- [ ] **Overnight schedule windows** - Fix schedules spanning midnight:
+  - e.g., 22:00 - 06:00 should work correctly
+  - Test edge cases around midnight
+  - Update TriggerEvaluator logic
+
+- [ ] **Schedule conflict detection** - Warn if schedules overlap:
+  - Same blocklist, overlapping times
+  - Show which schedules conflict
+
+#### Blocklist Improvements
+- [ ] **Blocklist presets** - Quick-start templates:
+  - Social Media (twitter.com, facebook.com, instagram.com, tiktok.com)
+  - News (cnn.com, nytimes.com, reddit.com)
+  - Video (youtube.com, netflix.com, twitch.tv)
+  - Gaming (steam, discord, twitch)
+  - User can customize after import
+
+- [ ] **Domain validation** - Validate domains on input:
+  - Strip protocols and paths automatically
+  - Warn on invalid domain format
+  - Suggest corrections (e.g., "www.youtube.com" → "youtube.com")
+
+- [ ] **Bulk domain add** - Paste multiple domains:
+  - Support comma, newline, or space-separated
+  - Show preview before adding
+
+#### Daemon Communication
+- [ ] **Heartbeat improvements** - More reliable daemon detection:
+  - Current: 15-second threshold
+  - Add "last seen" timestamp display
+  - Show "Reconnecting..." state during brief disconnects
+
+---
+
+## Phase 2: LATER - Distribution & Infrastructure
+
+### 2.1 Privileged Helper Architecture
+
+#### SMAppService.daemon vs SMJobBless Decision
+
+**Research Summary:**
+
+| Aspect | SMAppService.daemon | SMJobBless |
+|--------|---------------------|------------|
+| macOS Version | 13+ (Ventura) | 10.6+ |
+| Installation UX | User toggles switch in System Settings > Login Items | Single admin password prompt |
+| Daemon Location | Inside app bundle (removed with app) | `/Library/PrivilegedHelperTools/` (persists) |
+| Runs as Root | Yes (confirmed in Activity Monitor) | Yes |
+| Apple Recommendation | Preferred for macOS 13+ | Deprecated |
+| Complexity | Simpler setup | Complex Info.plist signing dance |
+| Uninstall | Clean (removed with app) | Orphaned helpers remain |
+
+**Recommendation: SMAppService.daemon**
+
+Reasons:
+1. Apple's recommended approach for macOS 13+ (our target is 15.6)
+2. Daemon runs as root (required for `/etc/hosts`)
+3. Clean uninstall - daemon removed with app
+4. Simpler maintenance than SMJobBless
+5. Future-proof (SMJobBless is deprecated)
+
+The "toggle in System Settings" UX is actually beneficial for tamper resistance - it's harder to find than killing a process, and the daemon stays protected.
+
+**Implementation:**
+- [ ] **Migrate to SMAppService.daemon**:
+  - Move daemon binary to `Contents/MacOS/` or `Contents/Library/LaunchServices/`
+  - Create launchd plist at `Contents/Library/LaunchDaemons/`
+  - Plist must include `BundleProgram`, `Label`, `MachServices`
+  - Register with `SMAppService.daemon(plistName:).register()`
+  - Guide user to System Settings > Login Items to approve
+
+- [ ] **XPC communication** - Replace file-based IPC:
+  - Define XPC protocol for commands/state
+  - Use `NSXPCConnection(machServiceName:)` for daemon communication
+  - More secure than file-based IPC
+
+**References:**
+- [SMAppService API Overview](https://theevilbit.github.io/posts/smappservice/)
+- [HelperToolApp - SMAppService Example](https://github.com/alienator88/HelperToolApp)
+- [Apple Forums: SMAppService with root Helper](https://developer.apple.com/forums/thread/733046)
+- [macOS Apps With Embedded Daemons](https://dev.to/brysontyrrell/macos-apps-with-embedded-daemons-333a)
+
+#### Daemon Tamper Resistance
+- [ ] **launchd KeepAlive** - Auto-restart if killed:
+  - Add `KeepAlive: true` to launchd plist
+  - Daemon restarts immediately if terminated via Activity Monitor
+  - Combined with locked blocks = robust protection
+
+- [ ] **Hide daemon from UI** - Core "willpower" principle:
+  - No "Stop Daemon" button anywhere
+  - Settings shows status only ("Protected")
+  - Only "Reinstall" for troubleshooting (buried)
+
+- [ ] **Daemon version sync**:
+  - Store version in daemon's Info.plist
+  - App checks version on launch
+  - If mismatch, prompt to re-approve in System Settings
+
+### 2.2 IPC Architecture
+
+- [ ] **Migrate to App Groups for production**:
+  - **Development**: File-based IPC at `/tmp/willpower` (current)
+  - **Production**: App Groups or XPC
+  - App Groups: `~/Library/Group Containers/<group-id>/`
+  - XPC: More secure, built into SMAppService daemon pattern
+  - Update `IPCManager` to support both modes
+
+- [ ] **IPC security hardening**:
+  - File permissions: 0o600 (not 0o777)
+  - Validate command parameters
+  - Rate-limit commands
+  - Use XPC audit tokens for caller verification
+
+### 2.3 Code Signing & Distribution
+
+#### Code Signing
+- [ ] **Developer ID signing**:
+  - Sign main app with "Developer ID Application"
+  - Sign daemon with "Developer ID Application"
+  - Enable Hardened Runtime for both
+  - Specific entitlements for SMAppService daemon
+
+#### Notarization
+- [ ] **Notarize for Gatekeeper**:
+  - Submit to Apple's notarization service
+  - Staple ticket to app bundle
+  - Test on clean macOS (no Xcode/developer tools)
+
+#### Distribution
+- [ ] **Direct distribution (DMG)**:
+  - App Store not viable (privileged helper not allowed)
+  - Create DMG with drag-to-Applications
+  - Include uninstaller or uninstall instructions
+  - Consider Sparkle for auto-updates
+
+- [ ] **Homebrew Cask** - For power users:
+  - Create cask formula
+  - Easy installation: `brew install --cask willpower`
+
+### 2.4 Error Handling & Recovery
+
+- [ ] **Daemon crash recovery**:
+  - launchd KeepAlive auto-restarts
+  - App shows "Reconnecting..." during brief disconnect
+  - If persistent failure, show "Reinstall" prompt
+
+- [ ] **State backup/recovery**:
+  - Backup state.json before each write
+  - Recover from backup on parse failure
+  - Never lose blocklist configurations
+
+- [ ] **Graceful degradation**:
+  - App works for configuration even without daemon
+  - Clear indicator when blocking is inactive
+  - Sync to daemon when it becomes available
+
+### 2.5 Security Hardening
+
+- [ ] **Hosts file integrity**:
+  - Verify managed section markers before modification
+  - Detect external tampering
+  - Alert user if /etc/hosts was modified outside app
+
+- [ ] **Command validation**:
+  - Validate all IPC command parameters
+  - Sanitize domain inputs
+  - Prevent injection attacks
+
+### 2.6 Technical Debt
+
+- [ ] **Unit tests** - Priority areas:
+  - TriggerEvaluator schedule/visit logic
+  - IPCManager serialization
+  - HostsManager parsing
+  - ViewModel state management
+
+- [ ] **Integration tests**:
+  - App → IPC → Daemon → hosts file flow
+  - Schedule activation timing
+  - Visit count threshold triggering
+
+- [ ] **Logging framework**:
+  - Replace print() with os_log
+  - Log levels: debug, info, error
+  - Redact sensitive data (domains?)
+
+- [ ] **CI/CD pipeline**:
+  - Automated builds
+  - Run tests
+  - Build notarized DMG for releases
+
+---
+
+## Phase 3: POST-LAUNCH - Feature Enhancements
+
+- [ ] **Browser extension** - More accurate URL monitoring than AppleScript
+- [ ] **Statistics dashboard** - Blocking history, visit counts over time, streaks
+- [ ] **Blocklist import/export** - Share configurations
 - [ ] **Focus mode integration** - Tie blocking to macOS Focus modes
-- [ ] **Statistics dashboard** - Show blocking history, visit counts over time
-- [ ] **Parental controls mode** - Password protection for settings
-- [ ] **Browser extension** - More accurate URL monitoring than polling
 - [ ] **iCloud sync** - Sync blocklists across devices
+- [ ] **Menu bar status item** - Quick access without opening app
 - [ ] **Widget support** - Show active blocks in Notification Center
-
-### Technical Debt
-
-- [ ] **Unit tests** - No test coverage currently
-- [ ] **SwiftData integration** - Consider migrating from UserDefaults for persistence
-- [ ] **Logging framework** - Replace print statements with proper logging
-- [ ] **Documentation** - Code documentation and user guide
-- [ ] **Info.plist configuration** - Fix PRODUCT_BUNDLE_IDENTIFIER warning for daemon
+- [ ] **Notifications** - Alert when block starts/ends
+- [ ] **Keyboard shortcuts** - Quick activation from anywhere
+- [ ] **Parental controls mode** - Password protection for settings
+- [ ] **Emergency bypass** - Configurable "break glass" with cooling period
 
 ---
 
