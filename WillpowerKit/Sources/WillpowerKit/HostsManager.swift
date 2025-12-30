@@ -169,6 +169,7 @@ public final class HostsManager: Sendable {
         }
 
         let blockContent = String(contents[startRange.upperBound..<endRange.lowerBound])
+        let validIPs: Set<String> = ["127.0.0.1", "0.0.0.0", "::1", "::"]
 
         return blockContent
             .components(separatedBy: .newlines)
@@ -176,12 +177,12 @@ public final class HostsManager: Sendable {
                 let trimmed = line.trimmingCharacters(in: .whitespaces)
                 guard !trimmed.isEmpty, !trimmed.hasPrefix("#") else { return nil }
 
-                // Parse "127.0.0.1 domain.com" or "0.0.0.0 domain.com"
+                // Parse "127.0.0.1 domain.com" or "0.0.0.0 domain.com" or "::1 domain.com"
                 let parts = trimmed.split(separator: " ", maxSplits: 1, omittingEmptySubsequences: true)
                 guard parts.count == 2 else { return nil }
 
                 let ip = String(parts[0])
-                guard ip == "127.0.0.1" || ip == "0.0.0.0" else { return nil }
+                guard validIPs.contains(ip) else { return nil }
 
                 return String(parts[1])
             }
@@ -242,15 +243,22 @@ public final class HostsManager: Sendable {
         }
 
         // Generate entries for each domain
-        // Use both 127.0.0.1 and 0.0.0.0 for more reliable blocking
+        // Use both 127.0.0.1 and 0.0.0.0 for IPv4 blocking
+        // Use ::1 and :: for IPv6 blocking (critical - browsers use IPv6!)
         // Also block www. variants
         var entries: [String] = []
 
         for domain in uniqueDomains.sorted() {
+            // IPv4 blocking
             entries.append("127.0.0.1 \(domain)")
             entries.append("127.0.0.1 www.\(domain)")
             entries.append("0.0.0.0 \(domain)")
             entries.append("0.0.0.0 www.\(domain)")
+            // IPv6 blocking
+            entries.append("::1 \(domain)")
+            entries.append("::1 www.\(domain)")
+            entries.append(":: \(domain)")
+            entries.append(":: www.\(domain)")
         }
 
         return entries.joined(separator: "\n") + "\n"
