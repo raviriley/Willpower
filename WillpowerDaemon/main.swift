@@ -131,10 +131,23 @@ func processCommands(
     print("[WillpowerDaemon] Processing \(commands.count) command(s)")
 
     for wrapper in commands {
+        // Skip stale commands older than 30 seconds to prevent replay of old commands
+        let commandAge = Date().timeIntervalSince(wrapper.timestamp)
+        if commandAge > 30 {
+            print("[WillpowerDaemon] SKIPPED: Stale command (age: \(Int(commandAge))s) - \(wrapper.command)")
+            try ipcManager.markCommandProcessed(wrapper.id)
+            continue
+        }
+
         print("[WillpowerDaemon] Command: \(wrapper.command)")
 
         switch wrapper.command {
         case .activateBlocklist(let blocklistId, let trigger, let isLocked):
+            // VALIDATE: Only activate if blocklist exists in current state
+            guard mutableState.blocklists.contains(where: { $0.id == blocklistId }) else {
+                print("[WillpowerDaemon] SKIPPED: activateBlocklist for non-existent blocklist \(blocklistId)")
+                break
+            }
             mutableState = activateBlocklist(
                 blocklistId,
                 trigger: trigger,
@@ -146,8 +159,40 @@ func processCommands(
             mutableState = deactivateBlocklist(blocklistId, state: mutableState)
 
         case .updateBlocklists(let blocklists):
+            // GUARD: Don't process empty updates if we have existing data
+            // This prevents race conditions from clearing state
+            if blocklists.isEmpty && !mutableState.blocklists.isEmpty {
+                print("[WillpowerDaemon] SKIPPED: updateBlocklists with empty array (preserving existing \(mutableState.blocklists.count) blocklists)")
+                break
+            }
+
             mutableState.blocklists = blocklists
             mutableState.lastUpdated = Date()
+
+            // Clean up orphaned active blocks (blocks for deleted blocklists)
+            let validBlocklistIds = Set(blocklists.map { $0.id })
+            let orphanedBlocks = mutableState.activeBlocks.filter { !validBlocklistIds.contains($0.blocklistId) }
+
+            if !orphanedBlocks.isEmpty {
+                print("[WillpowerDaemon] Cleaning up \(orphanedBlocks.count) orphaned active block(s)")
+                mutableState.activeBlocks.removeAll { !validBlocklistIds.contains($0.blocklistId) }
+            }
+
+            // Sync NEW domains to active blocks (add-only, never remove)
+            // This allows users to add domains to active blocklists
+            for (blockIdx, activeBlock) in mutableState.activeBlocks.enumerated() {
+                if let updatedBlocklist = blocklists.first(where: { $0.id == activeBlock.blocklistId }) {
+                    let currentDomains = Set(activeBlock.domains)
+                    let updatedDomains = Set(updatedBlocklist.domains)
+                    let newDomains = updatedDomains.subtracting(currentDomains)
+
+                    if !newDomains.isEmpty {
+                        print("[WillpowerDaemon] Adding \(newDomains.count) new domain(s) to active block for '\(updatedBlocklist.name)'")
+                        mutableState.activeBlocks[blockIdx].domains.append(contentsOf: newDomains)
+                    }
+                }
+            }
+
             // Reconfigure browser monitor with new patterns
             await configureBrowserMonitor(browserMonitor, state: mutableState)
 
@@ -299,9 +344,10 @@ func evaluateTriggers(
     var mutableState = state
 
     for (idx, blocklist) in mutableState.blocklists.enumerated() {
-        // Skip if blocklist has no visit-count triggers
+        // Skip if blocklist has no evaluatable triggers
         let hasVisitTrigger = blocklist.triggers.contains { $0.type == .visitCount && $0.isEnabled }
-        guard hasVisitTrigger else { continue }
+        let hasScheduleTrigger = blocklist.triggers.contains { $0.type == .scheduleBased && $0.isEnabled }
+        guard hasVisitTrigger || hasScheduleTrigger else { continue }
 
         // Check if already has an active block
         let existingBlock = mutableState.activeBlocks.first { $0.blocklistId == blocklist.id }
