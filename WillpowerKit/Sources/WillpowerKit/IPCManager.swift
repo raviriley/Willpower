@@ -7,17 +7,23 @@
 
 import Foundation
 
-/// Manages IPC between Willpower app and daemon via App Groups
-/// Thread-safe due to UserDefaults' internal synchronization
+/// Manages IPC between Willpower app and daemon
+/// Uses file-based IPC as primary (works without App Group provisioning)
+/// Falls back to App Groups UserDefaults if available
 public final class IPCManager: @unchecked Sendable {
 
     // MARK: - Constants
 
     /// App Group identifier - must match in both app and daemon entitlements
-    /// Format: group.TEAMID.com.yourcompany.willpower
     public static let appGroupIdentifier = "group.P5AM8FWTFW.raviriley.Willpower"
 
-    /// Keys for UserDefaults storage
+    /// File-based IPC directory (accessible by both sandboxed app and root daemon)
+    public static let ipcDirectory = "/tmp/willpower"
+    public static let stateFile = "/tmp/willpower/state.json"
+    public static let commandsFile = "/tmp/willpower/commands.json"
+    public static let heartbeatFile = "/tmp/willpower/heartbeat"
+
+    /// Keys for UserDefaults storage (fallback)
     private enum Keys {
         static let state = "willpower.state"
         static let commands = "willpower.commands"
@@ -30,10 +36,11 @@ public final class IPCManager: @unchecked Sendable {
     private let defaults: UserDefaults?
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
+    private let fileManager = FileManager.default
 
     /// Whether App Groups access is available
     public var isAvailable: Bool {
-        return defaults != nil
+        return defaults != nil || fileManager.isWritableFile(atPath: Self.ipcDirectory)
     }
 
     // MARK: - Initialization
@@ -47,9 +54,20 @@ public final class IPCManager: @unchecked Sendable {
         encoder.dateEncodingStrategy = .iso8601
         decoder.dateDecodingStrategy = .iso8601
 
+        // Ensure IPC directory exists
+        ensureIPCDirectory()
+
         if defaults == nil {
-            print("[IPCManager] WARNING: Could not access App Group UserDefaults.")
-            print("[IPCManager] Ensure '\(Self.appGroupIdentifier)' is in entitlements.")
+            print("[IPCManager] App Group UserDefaults not available, using file-based IPC")
+        }
+    }
+
+    /// Ensure the IPC directory exists
+    private func ensureIPCDirectory() {
+        if !fileManager.fileExists(atPath: Self.ipcDirectory) {
+            try? fileManager.createDirectory(atPath: Self.ipcDirectory, withIntermediateDirectories: true)
+            // Make it world-readable/writable for IPC between user app and root daemon
+            try? fileManager.setAttributes([.posixPermissions: 0o777], ofItemAtPath: Self.ipcDirectory)
         }
     }
 
@@ -57,26 +75,34 @@ public final class IPCManager: @unchecked Sendable {
 
     /// Save the current Willpower state (typically called by daemon)
     public func saveState(_ state: WillpowerState) throws {
-        guard let defaults else {
-            throw IPCError.appGroupsUnavailable
-        }
-
         let data = try encoder.encode(state)
-        defaults.set(data, forKey: Keys.state)
-        defaults.synchronize()
+
+        // Primary: file-based
+        ensureIPCDirectory()
+        let url = URL(fileURLWithPath: Self.stateFile)
+        try data.write(to: url, options: .atomic)
+        try? fileManager.setAttributes([.posixPermissions: 0o666], ofItemAtPath: Self.stateFile)
+
+        // Fallback: also save to UserDefaults if available
+        defaults?.set(data, forKey: Keys.state)
+        defaults?.synchronize()
     }
 
     /// Load the current Willpower state
     public func loadState() throws -> WillpowerState? {
-        guard let defaults else {
-            throw IPCError.appGroupsUnavailable
+        // Primary: try file-based first
+        let url = URL(fileURLWithPath: Self.stateFile)
+        if fileManager.fileExists(atPath: Self.stateFile),
+           let data = try? Data(contentsOf: url) {
+            return try decoder.decode(WillpowerState.self, from: data)
         }
 
-        guard let data = defaults.data(forKey: Keys.state) else {
-            return nil
+        // Fallback: try UserDefaults
+        if let defaults, let data = defaults.data(forKey: Keys.state) {
+            return try decoder.decode(WillpowerState.self, from: data)
         }
 
-        return try decoder.decode(WillpowerState.self, from: data)
+        return nil
     }
 
     /// Load state or return a default empty state
@@ -93,89 +119,133 @@ public final class IPCManager: @unchecked Sendable {
 
     /// Queue a command for the daemon to process
     public func queueCommand(_ command: DaemonCommand) throws {
-        guard let defaults else {
-            throw IPCError.appGroupsUnavailable
-        }
-
         // Load existing commands
         var commands = (try? loadPendingCommands()) ?? []
+
+        // DEDUPLICATION: For updateBlocklists, remove any existing updateBlocklists commands
+        // since we only care about the latest blocklist state
+        if case .updateBlocklists = command {
+            let beforeCount = commands.count
+            commands.removeAll { wrapper in
+                if case .updateBlocklists = wrapper.command { return true }
+                return false
+            }
+            if beforeCount != commands.count {
+                print("[IPCManager] Deduplicated \(beforeCount - commands.count) stale updateBlocklists command(s)")
+            }
+        }
 
         // Add new command with wrapper
         let wrapper = CommandWrapper(command: command)
         commands.append(wrapper)
 
-        // Save back
+        // Save to file
         let data = try encoder.encode(commands)
-        defaults.set(data, forKey: Keys.commands)
-        defaults.synchronize()
+        ensureIPCDirectory()
+        let url = URL(fileURLWithPath: Self.commandsFile)
+        try data.write(to: url, options: .atomic)
+        try? fileManager.setAttributes([.posixPermissions: 0o666], ofItemAtPath: Self.commandsFile)
+
+        // Also save to UserDefaults if available
+        defaults?.set(data, forKey: Keys.commands)
+        defaults?.synchronize()
     }
 
     /// Load pending commands (called by daemon)
     public func loadPendingCommands() throws -> [CommandWrapper] {
-        guard let defaults else {
-            throw IPCError.appGroupsUnavailable
+        // Primary: try file-based first
+        let url = URL(fileURLWithPath: Self.commandsFile)
+        if fileManager.fileExists(atPath: Self.commandsFile),
+           let data = try? Data(contentsOf: url) {
+            return try decoder.decode([CommandWrapper].self, from: data)
         }
 
-        guard let data = defaults.data(forKey: Keys.commands) else {
-            return []
+        // Fallback: try UserDefaults
+        if let defaults, let data = defaults.data(forKey: Keys.commands) {
+            return try decoder.decode([CommandWrapper].self, from: data)
         }
 
-        return try decoder.decode([CommandWrapper].self, from: data)
+        return []
     }
 
     /// Clear all pending commands (called by daemon after processing)
     public func clearPendingCommands() throws {
-        guard let defaults else {
-            throw IPCError.appGroupsUnavailable
-        }
+        // Remove file
+        try? fileManager.removeItem(atPath: Self.commandsFile)
 
-        defaults.removeObject(forKey: Keys.commands)
-        defaults.synchronize()
+        // Also clear UserDefaults
+        defaults?.removeObject(forKey: Keys.commands)
+        defaults?.synchronize()
     }
 
     /// Mark a specific command as processed by removing it
     public func markCommandProcessed(_ commandId: UUID) throws {
-        guard let defaults else {
-            throw IPCError.appGroupsUnavailable
-        }
-
         var commands = try loadPendingCommands()
         commands.removeAll { $0.id == commandId }
 
         if commands.isEmpty {
-            defaults.removeObject(forKey: Keys.commands)
+            try? fileManager.removeItem(atPath: Self.commandsFile)
+            defaults?.removeObject(forKey: Keys.commands)
         } else {
             let data = try encoder.encode(commands)
-            defaults.set(data, forKey: Keys.commands)
+            let url = URL(fileURLWithPath: Self.commandsFile)
+            try data.write(to: url, options: .atomic)
+            defaults?.set(data, forKey: Keys.commands)
         }
-        defaults.synchronize()
+        defaults?.synchronize()
     }
 
     // MARK: - Daemon Heartbeat
 
     /// Update daemon heartbeat (called periodically by daemon)
     public func updateDaemonHeartbeat() {
-        guard let defaults else { return }
-        defaults.set(Date().timeIntervalSince1970, forKey: Keys.daemonHeartbeat)
-        defaults.synchronize()
+        let timestamp = Date().timeIntervalSince1970
+
+        // Primary: write to file
+        ensureIPCDirectory()
+        let timestampString = String(timestamp)
+        try? timestampString.write(toFile: Self.heartbeatFile, atomically: true, encoding: .utf8)
+        try? fileManager.setAttributes([.posixPermissions: 0o666], ofItemAtPath: Self.heartbeatFile)
+
+        // Also update UserDefaults if available
+        defaults?.set(timestamp, forKey: Keys.daemonHeartbeat)
+        defaults?.synchronize()
     }
 
     /// Check if daemon is alive (heartbeat within threshold)
     public func isDaemonAlive(threshold: TimeInterval = 15.0) -> Bool {
-        guard let defaults,
-              let timestamp = defaults.object(forKey: Keys.daemonHeartbeat) as? TimeInterval else {
-            return false
+        // Primary: check file-based heartbeat
+        if fileManager.fileExists(atPath: Self.heartbeatFile),
+           let contents = try? String(contentsOfFile: Self.heartbeatFile, encoding: .utf8),
+           let timestamp = TimeInterval(contents) {
+            return Date().timeIntervalSince1970 - timestamp < threshold
         }
-        return Date().timeIntervalSince1970 - timestamp < threshold
+
+        // Fallback: check UserDefaults
+        if let defaults,
+           let timestamp = defaults.object(forKey: Keys.daemonHeartbeat) as? TimeInterval {
+            return Date().timeIntervalSince1970 - timestamp < threshold
+        }
+
+        return false
     }
 
     /// Get last daemon heartbeat time
     public func lastDaemonHeartbeat() -> Date? {
-        guard let defaults,
-              let timestamp = defaults.object(forKey: Keys.daemonHeartbeat) as? TimeInterval else {
-            return nil
+        // Primary: check file-based heartbeat
+        if fileManager.fileExists(atPath: Self.heartbeatFile),
+           let contents = try? String(contentsOfFile: Self.heartbeatFile, encoding: .utf8),
+           let timestamp = TimeInterval(contents) {
+            return Date(timeIntervalSince1970: timestamp)
         }
-        return Date(timeIntervalSince1970: timestamp)
+
+        // Fallback: check UserDefaults
+        if let defaults,
+           let timestamp = defaults.object(forKey: Keys.daemonHeartbeat) as? TimeInterval {
+            return Date(timeIntervalSince1970: timestamp)
+        }
+
+        return nil
     }
 
     /// Get seconds since last heartbeat (nil if never)
