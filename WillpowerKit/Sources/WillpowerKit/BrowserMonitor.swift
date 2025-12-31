@@ -121,7 +121,7 @@ public actor BrowserMonitor {
     private var monitoringTask: Task<Void, Never>?
     private var visitRecords: [UUID: VisitRecord] = [:]
     private var patterns: [URLPattern] = []
-    private var pollingInterval: TimeInterval = 3.0
+    private var pollingInterval: TimeInterval = 1.0
 
     /// Last seen URL to avoid counting the same page visit multiple times
     private var lastSeenURLs: [Browser: String] = [:]
@@ -141,6 +141,18 @@ public actor BrowserMonitor {
     // MARK: - Initialization
 
     public init() {}
+
+    // MARK: - Callback Setup
+
+    /// Set the callback for pattern matches (must be called from within actor context)
+    public func setOnPatternMatch(_ callback: (@Sendable (URLPattern, VisitRecord) async -> Void)?) {
+        self.onPatternMatch = callback
+    }
+
+    /// Set the callback for threshold exceeded (must be called from within actor context)
+    public func setOnThresholdExceeded(_ callback: (@Sendable (URLPattern, VisitRecord, Int) async -> Void)?) {
+        self.onThresholdExceeded = callback
+    }
 
     // MARK: - Configuration
 

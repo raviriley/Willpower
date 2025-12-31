@@ -6,5 +6,7 @@
 	<array>
 		<string>group.P5AM8FWTFW.raviriley.Willpower</string>
 	</array>
+	<key>com.apple.security.automation.apple-events</key>
+	<true/>
 </dict>
 </plist>

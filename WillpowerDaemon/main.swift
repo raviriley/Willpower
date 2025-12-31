@@ -5,7 +5,6 @@ import WillpowerKit
 
 private let daemonVersion = "1.0.0"
 private let runLoopInterval: TimeInterval = 5.0
-private let browserPollingInterval: TimeInterval = 3.0
 private let heartbeatInterval: TimeInterval = 5.0
 
 // MARK: - Main Entry Point
@@ -23,8 +22,12 @@ if getuid() != 0 {
 // Initialize components
 let hostsManager = HostsManager()
 let ipcManager = IPCManager()
-let browserMonitor = BrowserMonitor()
 let triggerEvaluator = TriggerEvaluator()
+
+// NOTE: BrowserMonitor runs in the app, not the daemon.
+// The daemon runs as root and doesn't have access to user's GUI session
+// or Automation permissions needed for AppleScript browser monitoring.
+// The app reports visits via IPC using the .reportVisit command.
 
 // Check IPC availability
 guard ipcManager.isAvailable else {
@@ -40,10 +43,6 @@ print("[WillpowerDaemon] Loaded state: \(state.blocklists.count) blocklists, \(s
 
 // Start async operations
 Task {
-    // Configure browser monitor
-    await configureBrowserMonitor(browserMonitor, state: state)
-    await browserMonitor.startMonitoring()
-
     print("[WillpowerDaemon] Initialized. Entering run loop...")
 
     // Main run loop
@@ -59,16 +58,11 @@ Task {
                 lastHeartbeat = now
             }
 
-            // Process pending commands from app
+            // Process pending commands from app (includes visit reports)
             state = try await processCommands(
                 ipcManager: ipcManager,
-                state: state,
-                browserMonitor: browserMonitor
+                state: state
             )
-
-            // Update visit records from browser monitor
-            let currentRecords = await browserMonitor.getVisitRecords()
-            state = updateVisitRecords(state: state, newRecords: currentRecords)
 
             // Evaluate triggers and update blocks
             state = evaluateTriggers(
@@ -97,31 +91,11 @@ Task {
 // Keep the process alive
 dispatchMain()
 
-// MARK: - Browser Monitor Configuration
-
-func configureBrowserMonitor(_ monitor: BrowserMonitor, state: WillpowerState) async {
-    // Collect all URL patterns from visit-count triggers
-    var patterns: [URLPattern] = []
-
-    for blocklist in state.blocklists {
-        for trigger in blocklist.triggers where trigger.type == .visitCount {
-            if let visitConfig = trigger.visitCount {
-                patterns.append(contentsOf: visitConfig.urlPatterns)
-            }
-        }
-    }
-
-    await monitor.setPatterns(patterns)
-    await monitor.setPollingInterval(browserPollingInterval)
-    await monitor.restoreVisitRecords(state.visitRecords)
-}
-
 // MARK: - Command Processing
 
 func processCommands(
     ipcManager: IPCManager,
-    state: WillpowerState,
-    browserMonitor: BrowserMonitor
+    state: WillpowerState
 ) async throws -> WillpowerState {
     var mutableState = state
     let commands = try ipcManager.loadPendingCommands()
@@ -193,15 +167,11 @@ func processCommands(
                 }
             }
 
-            // Reconfigure browser monitor with new patterns
-            await configureBrowserMonitor(browserMonitor, state: mutableState)
-
         case .forceSync:
             mutableState.lastUpdated = Date()
 
         case .resetVisitCounts(let patternIds):
-            await browserMonitor.resetVisitCounts(patternIds: patternIds)
-            // Also reset in state
+            // Reset visit counts in state
             if let ids = patternIds {
                 for id in ids {
                     if let idx = mutableState.visitRecords.firstIndex(where: { $0.patternId == id }) {
@@ -213,6 +183,31 @@ func processCommands(
                     mutableState.visitRecords[idx].reset()
                 }
             }
+
+        case .reportVisit(let patternId, let url):
+            // Visit reported from app (which runs BrowserMonitor)
+            if let idx = mutableState.visitRecords.firstIndex(where: { $0.patternId == patternId }) {
+                mutableState.visitRecords[idx].recordVisit()
+                print("[WillpowerDaemon] Visit recorded for pattern \(patternId): count=\(mutableState.visitRecords[idx].visitCount)")
+            } else {
+                // Create new visit record if it doesn't exist
+                // Find the pattern string from blocklist triggers
+                var patternString = url
+                for blocklist in mutableState.blocklists {
+                    for trigger in blocklist.triggers where trigger.type == .visitCount {
+                        if let vc = trigger.visitCount,
+                           let pattern = vc.urlPatterns.first(where: { $0.id == patternId }) {
+                            patternString = pattern.pattern
+                            break
+                        }
+                    }
+                }
+                var record = VisitRecord(patternId: patternId, pattern: patternString)
+                record.recordVisit()
+                mutableState.visitRecords.append(record)
+                print("[WillpowerDaemon] New visit record created for pattern \(patternId)")
+            }
+            mutableState.lastUpdated = Date()
         }
 
         try ipcManager.markCommandProcessed(wrapper.id)
@@ -316,22 +311,6 @@ func deactivateBlocklist(_ blocklistId: UUID, state: WillpowerState) -> Willpowe
     }
 
     mutableState.lastUpdated = Date()
-    return mutableState
-}
-
-// MARK: - Visit Records Update
-
-func updateVisitRecords(state: WillpowerState, newRecords: [VisitRecord]) -> WillpowerState {
-    var mutableState = state
-
-    for record in newRecords {
-        if let idx = mutableState.visitRecords.firstIndex(where: { $0.patternId == record.patternId }) {
-            mutableState.visitRecords[idx] = record
-        } else {
-            mutableState.visitRecords.append(record)
-        }
-    }
-
     return mutableState
 }
 

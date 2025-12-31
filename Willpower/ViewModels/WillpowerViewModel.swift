@@ -7,6 +7,7 @@
 
 import Foundation
 import WillpowerKit
+import AppKit
 
 /// Sidebar navigation categories
 enum SidebarCategory: String, CaseIterable, Identifiable {
@@ -54,6 +55,14 @@ final class WillpowerViewModel {
     /// IPC availability
     var isIPCAvailable: Bool = false
 
+    // MARK: - Browser Monitoring State
+
+    /// Whether browser monitoring is active
+    var isBrowserMonitoringActive: Bool = false
+
+    /// Whether Automation permission is granted (needed for AppleScript)
+    var hasAutomationPermission: Bool = false
+
     // MARK: - UI State
 
     var selectedCategory: SidebarCategory = .status
@@ -67,6 +76,7 @@ final class WillpowerViewModel {
 
     private let ipcManager: IPCManager
     private var syncTimer: Timer?
+    private let browserMonitor: BrowserMonitor
 
     /// Local storage key for blocklists (fallback when IPC unavailable)
     private let localBlocklistsKey = "willpower.local.blocklists"
@@ -75,10 +85,30 @@ final class WillpowerViewModel {
 
     init(ipcManager: IPCManager = IPCManager()) {
         self.ipcManager = ipcManager
+        self.browserMonitor = BrowserMonitor()
         self.isIPCAvailable = ipcManager.isAvailable
 
         // Load initial state from local storage
         loadLocalState()
+
+        // Setup browser monitor callback
+        Task {
+            await setupBrowserMonitorCallback()
+        }
+    }
+
+    /// Setup the callback for when BrowserMonitor detects a pattern match
+    private func setupBrowserMonitorCallback() async {
+        await browserMonitor.setOnPatternMatch { [weak self] pattern, record in
+            guard let self else { return }
+            // Report visit to daemon via IPC
+            do {
+                try self.ipcManager.reportVisit(patternId: pattern.id, url: pattern.pattern)
+                print("[WillpowerViewModel] Reported visit for pattern: \(pattern.pattern)")
+            } catch {
+                print("[WillpowerViewModel] Failed to report visit: \(error)")
+            }
+        }
     }
 
     // MARK: - Local Storage (Fallback)
@@ -103,6 +133,11 @@ final class WillpowerViewModel {
         Task { @MainActor in
             syncState()
 
+            // Start browser monitoring if there are visit-count triggers
+            if hasVisitCountTriggers {
+                startBrowserMonitoring()
+            }
+
             syncTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
                 Task { @MainActor [weak self] in
                     self?.syncState()
@@ -111,10 +146,86 @@ final class WillpowerViewModel {
         }
     }
 
+    /// Check if any blocklist has visit-count triggers
+    private var hasVisitCountTriggers: Bool {
+        blocklists.contains { blocklist in
+            blocklist.triggers.contains { $0.type == .visitCount && $0.isEnabled }
+        }
+    }
+
     /// Stop state synchronization
     func stopStateSync() {
         syncTimer?.invalidate()
         syncTimer = nil
+    }
+
+    // MARK: - Browser Monitoring
+
+    /// Start browser monitoring for visit-count triggers
+    func startBrowserMonitoring() {
+        Task {
+            // Configure patterns from blocklists
+            await configureBrowserMonitorPatterns()
+
+            // Start monitoring
+            await browserMonitor.startMonitoring()
+            isBrowserMonitoringActive = await browserMonitor.isActive()
+            print("[WillpowerViewModel] Browser monitoring started")
+        }
+    }
+
+    /// Stop browser monitoring
+    func stopBrowserMonitoring() {
+        Task {
+            await browserMonitor.stopMonitoring()
+            isBrowserMonitoringActive = false
+            print("[WillpowerViewModel] Browser monitoring stopped")
+        }
+    }
+
+    /// Configure browser monitor with URL patterns from all visit-count triggers
+    private func configureBrowserMonitorPatterns() async {
+        var patterns: [URLPattern] = []
+
+        for blocklist in blocklists {
+            for trigger in blocklist.triggers where trigger.type == .visitCount && trigger.isEnabled {
+                if let visitConfig = trigger.visitCount {
+                    patterns.append(contentsOf: visitConfig.urlPatterns)
+                }
+            }
+        }
+
+        await browserMonitor.setPatterns(patterns)
+        print("[WillpowerViewModel] Configured browser monitor with \(patterns.count) pattern(s)")
+    }
+
+    /// Reconfigure browser monitor when blocklists change
+    func reconfigureBrowserMonitor() {
+        guard isBrowserMonitoringActive else { return }
+        Task {
+            await configureBrowserMonitorPatterns()
+        }
+    }
+
+    // MARK: - Automation Permission
+
+    /// Check if Automation permission is granted (needed for AppleScript browser access)
+    /// Note: There's no direct API to check Automation permission - we detect it by attempting AppleScript
+    func checkAutomationPermission() {
+        // The first AppleScript execution will trigger the permission prompt
+        // We can't directly check without triggering the prompt
+        // For now, we assume it's granted if browser monitoring works
+        hasAutomationPermission = true
+    }
+
+    /// Open System Preferences to Automation settings
+    func openAutomationPreferences() {
+        AccessibilityHelper.openAutomationPreferences()
+    }
+
+    /// Open System Preferences to Accessibility settings
+    func openAccessibilityPreferences() {
+        AccessibilityHelper.openAccessibilityPreferences()
     }
 
     /// Sync state - only overwrite local if daemon is running
@@ -202,6 +313,8 @@ final class WillpowerViewModel {
     private func syncBlocklistsToIPC() {
         do {
             try ipcManager.updateBlocklists(blocklists)
+            // Also reconfigure browser monitor with new patterns
+            reconfigureBrowserMonitor()
         } catch {
             // Log but don't show error to user - local state is saved
             print("[WillpowerViewModel] IPC sync failed: \(error.localizedDescription)")

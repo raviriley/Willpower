@@ -287,6 +287,11 @@ public final class IPCManager: @unchecked Sendable {
         try queueCommand(.resetVisitCounts(patternIds: patternIds))
     }
 
+    /// Report a URL visit (called by app which runs BrowserMonitor)
+    public func reportVisit(patternId: UUID, url: String) throws {
+        try queueCommand(.reportVisit(patternId: patternId, url: url))
+    }
+
     // MARK: - Debug
 
     /// Clear all IPC data (for testing/debugging only)
