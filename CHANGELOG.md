@@ -240,12 +240,12 @@ TODOs are organized into two phases:
   - Show which schedules conflict
 
 #### Blocklist Improvements
-- [ ] **Blocklist presets** - Quick-start templates:
-  - Social Media (twitter.com, facebook.com, instagram.com, tiktok.com)
-  - News (cnn.com, nytimes.com, reddit.com)
-  - Video (youtube.com, netflix.com, twitch.tv)
-  - Gaming (steam, discord, twitch)
-  - User can customize after import
+- [x] **Blocklist presets** - **IMPLEMENTED**:
+  - Social Media: twitter, x, facebook, instagram, tiktok, snapchat, linkedin, threads
+  - News & Reddit: reddit, HN, cnn, nytimes, bbc, foxnews, guardian, washingtonpost
+  - Video Streaming: youtube, netflix, hulu, disney+, twitch, prime video, hbo, peacock
+  - Gaming: steam, discord, twitch, epic, roblox, ea, battle.net
+  - Shows in "Start from Template" section when creating new blocklist
 
 - [x] **Domain validation** - **IMPLEMENTED**:
   - Strips protocols (http/https) and paths automatically

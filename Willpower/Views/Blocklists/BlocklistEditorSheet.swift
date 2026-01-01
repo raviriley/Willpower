@@ -8,6 +8,64 @@
 import SwiftUI
 import WillpowerKit
 
+// MARK: - Blocklist Presets
+
+enum BlocklistPreset: String, CaseIterable, Identifiable {
+    case socialMedia = "Social Media"
+    case news = "News & Reddit"
+    case video = "Video Streaming"
+    case gaming = "Gaming"
+
+    var id: String { rawValue }
+
+    var icon: String {
+        switch self {
+        case .socialMedia: return "bubble.left.and.bubble.right"
+        case .news: return "newspaper"
+        case .video: return "play.rectangle"
+        case .gaming: return "gamecontroller"
+        }
+    }
+
+    var domains: [String] {
+        switch self {
+        case .socialMedia:
+            return [
+                "twitter.com", "x.com", "facebook.com", "instagram.com",
+                "tiktok.com", "snapchat.com", "linkedin.com", "threads.net"
+            ]
+        case .news:
+            return [
+                "reddit.com", "news.ycombinator.com", "cnn.com", "nytimes.com",
+                "bbc.com", "foxnews.com", "theguardian.com", "washingtonpost.com"
+            ]
+        case .video:
+            return [
+                "youtube.com", "netflix.com", "hulu.com", "disneyplus.com",
+                "twitch.tv", "primevideo.com", "hbomax.com", "peacocktv.com"
+            ]
+        case .gaming:
+            return [
+                "store.steampowered.com", "discord.com", "twitch.tv",
+                "epicgames.com", "roblox.com", "ea.com", "battle.net"
+            ]
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .socialMedia:
+            return "Block social media platforms"
+        case .news:
+            return "Block news sites and Reddit"
+        case .video:
+            return "Block video streaming services"
+        case .gaming:
+            return "Block gaming platforms"
+        }
+    }
+}
+
 struct BlocklistEditorSheet: View {
     @Bindable var viewModel: WillpowerViewModel
     let blocklist: BlocklistConfig?
@@ -45,6 +103,34 @@ struct BlocklistEditorSheet: View {
                 Section("Name") {
                     TextField("Blocklist Name", text: $name)
                         .textFieldStyle(.plain)
+                }
+
+                // Preset templates (only show when creating new blocklist)
+                if !isEditing && domains.isEmpty {
+                    Section("Start from Template") {
+                        ForEach(BlocklistPreset.allCases) { preset in
+                            Button {
+                                applyPreset(preset)
+                            } label: {
+                                HStack {
+                                    Image(systemName: preset.icon)
+                                        .foregroundStyle(.blue)
+                                        .frame(width: 24)
+                                    VStack(alignment: .leading) {
+                                        Text(preset.rawValue)
+                                            .foregroundStyle(.primary)
+                                        Text("\(preset.domains.count) sites")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                    Image(systemName: "plus.circle")
+                                        .foregroundStyle(.blue)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
                 }
 
                 // Active blocklist warning banner
@@ -151,6 +237,19 @@ struct BlocklistEditorSheet: View {
                 domains = blocklist.domains
                 // Store original domains to prevent removal when active
                 originalDomains = Set(blocklist.domains)
+            }
+        }
+    }
+
+    private func applyPreset(_ preset: BlocklistPreset) {
+        // Set name from preset if empty
+        if name.isEmpty {
+            name = preset.rawValue
+        }
+        // Add all preset domains (avoiding duplicates)
+        for domain in preset.domains {
+            if !domains.contains(domain) {
+                domains.append(domain)
             }
         }
     }
