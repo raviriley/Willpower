@@ -234,35 +234,27 @@ final class WillpowerViewModel {
         AccessibilityHelper.openAccessibilityPreferences()
     }
 
-    /// Sync state - only overwrite local if daemon is running
+    /// Sync state from daemon - only syncs runtime state (active blocks, visits)
+    /// Blocklists and triggers are managed locally and pushed TO daemon, never pulled FROM.
     func syncState() {
         // Check daemon status
         isDaemonRunning = ipcManager.isDaemonAlive(threshold: 15.0)
         lastDaemonHeartbeat = ipcManager.lastDaemonHeartbeat()
 
         // Only sync FROM daemon if it's actually running
-        // This prevents empty IPC state from overwriting local data
         if isDaemonRunning {
             let state = ipcManager.loadStateOrDefault()
 
-            // Only update blocklists from daemon if daemon has data
-            // or if we have no local data
-            if !state.blocklists.isEmpty || blocklists.isEmpty {
-                blocklists = state.blocklists
-            }
+            // IMPORTANT: Don't sync blocklists/triggers FROM daemon!
+            // The app is the source of truth. We push TO daemon, never pull FROM.
+            // This prevents daemon's stale state from overwriting optimistic updates.
 
-            // Sync independent triggers from daemon
-            if !state.independentTriggers.isEmpty || independentTriggers.isEmpty {
-                independentTriggers = state.independentTriggers
-            }
-
-            saveLocalState() // Keep local storage in sync
-
+            // Only sync runtime state that daemon manages:
             activeBlocks = state.activeBlocks.filter { !$0.isExpired }
             visitRecords = state.visitRecords
             daemonVersion = state.daemonVersion
         } else {
-            // Daemon not running - just ensure local state is loaded
+            // Daemon not running - ensure local state is loaded
             if blocklists.isEmpty || independentTriggers.isEmpty {
                 loadLocalState()
             }
@@ -327,8 +319,8 @@ final class WillpowerViewModel {
             try ipcManager.updateBlocklists(blocklists)
             // Also reconfigure browser monitor with new patterns
             reconfigureBrowserMonitor()
-            // Force immediate state sync to reflect changes
-            syncState()
+            // Note: Don't call syncState() here - it would read stale daemon state
+            // and overwrite our optimistic local update. The polling timer handles sync.
         } catch {
             // Log but don't show error to user - local state is saved
             print("[WillpowerViewModel] IPC sync failed: \(error.localizedDescription)")
@@ -451,15 +443,14 @@ final class WillpowerViewModel {
 
     /// Delete an independent trigger
     func deleteIndependentTrigger(_ trigger: IndependentTrigger) {
-        // Update local state first
+        // Update local state first (optimistic update)
         independentTriggers.removeAll { $0.id == trigger.id }
         saveLocalState()
 
         // Try to sync to IPC
         do {
             try ipcManager.deleteIndependentTrigger(triggerId: trigger.id)
-            // Force immediate state sync to reflect deletion
-            syncState()
+            // Note: Don't call syncState() here - it would read stale daemon state
         } catch {
             print("[WillpowerViewModel] IPC delete trigger failed: \(error.localizedDescription)")
         }
@@ -477,8 +468,8 @@ final class WillpowerViewModel {
     private func syncTriggersToIPC() {
         do {
             try ipcManager.updateIndependentTriggers(independentTriggers)
-            // Force immediate state sync to reflect changes
-            syncState()
+            // Note: Don't call syncState() here - it would read stale daemon state
+            // and overwrite our optimistic local update. The polling timer handles sync.
         } catch {
             // Log but don't show error to user - local state is saved
             print("[WillpowerViewModel] IPC trigger sync failed: \(error.localizedDescription)")
