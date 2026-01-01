@@ -201,10 +201,10 @@ TODOs are organized into two phases:
   - Red: blocked/error
   - Gray: disabled/inactive
 
-- [ ] **Empty states** - Improve empty state views:
-  - Blocklists: Show benefit of creating first blocklist
-  - Schedules: Explain automation value
-  - Triggers: Explain visit-count concept
+- [x] **Empty states** - **IMPROVED**:
+  - Blocklists: Explains grouping and automation benefits
+  - Schedules: Highlights work hours, study, bedtime use cases
+  - Triggers: Explains visit limiting for addictive sites
 
 - [ ] **Loading states** - Show activity during:
   - Daemon communication

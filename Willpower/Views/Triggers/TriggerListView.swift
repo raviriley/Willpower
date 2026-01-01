@@ -80,7 +80,7 @@ struct TriggerListView: View {
                 ContentUnavailableView {
                     Label("No Triggers", systemImage: "eye.trianglebadge.exclamationmark")
                 } description: {
-                    Text("Create a visit-count trigger to automatically block sites after too many visits")
+                    Text("Triggers monitor your browsing and automatically block websites after too many visits. Great for limiting time on addictive sites without blocking them entirely.")
                 } actions: {
                     Button("Add Trigger") {
                         isShowingNewTrigger = true

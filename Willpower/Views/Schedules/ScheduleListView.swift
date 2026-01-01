@@ -84,7 +84,7 @@ struct ScheduleListView: View {
                 ContentUnavailableView {
                     Label("No Schedules", systemImage: "calendar.badge.clock")
                 } description: {
-                    Text("Create a schedule to automatically activate blocklists at specific times")
+                    Text("Schedules automatically block websites at specific times. Perfect for work hours, study sessions, or bedtime routines.")
                 } actions: {
                     if !viewModel.blocklists.isEmpty {
                         Menu("Add Schedule") {

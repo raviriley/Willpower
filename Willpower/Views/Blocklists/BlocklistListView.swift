@@ -70,7 +70,7 @@ struct BlocklistListView: View {
                 ContentUnavailableView {
                     Label("No Blocklists", systemImage: "list.bullet.rectangle")
                 } description: {
-                    Text("Create a blocklist to start blocking websites")
+                    Text("Create a blocklist to group distracting websites together. Block them manually or automatically with schedules and triggers.")
                 } actions: {
                     Button("Create Blocklist") {
                         viewModel.isShowingNewBlocklistSheet = true
