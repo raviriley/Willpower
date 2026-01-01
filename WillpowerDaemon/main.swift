@@ -191,14 +191,23 @@ func processCommands(
                 print("[WillpowerDaemon] Visit recorded for pattern \(patternId): count=\(mutableState.visitRecords[idx].visitCount)")
             } else {
                 // Create new visit record if it doesn't exist
-                // Find the pattern string from blocklist triggers
+                // Find the pattern string from independent triggers first
                 var patternString = url
-                for blocklist in mutableState.blocklists {
-                    for trigger in blocklist.triggers where trigger.type == .visitCount {
-                        if let vc = trigger.visitCount,
-                           let pattern = vc.urlPatterns.first(where: { $0.id == patternId }) {
-                            patternString = pattern.pattern
-                            break
+                for trigger in mutableState.independentTriggers {
+                    if let pattern = trigger.urlPatterns.first(where: { $0.id == patternId }) {
+                        patternString = pattern.pattern
+                        break
+                    }
+                }
+                // Fall back to blocklist triggers (legacy)
+                if patternString == url {
+                    for blocklist in mutableState.blocklists {
+                        for trigger in blocklist.triggers where trigger.type == .visitCount {
+                            if let vc = trigger.visitCount,
+                               let pattern = vc.urlPatterns.first(where: { $0.id == patternId }) {
+                                patternString = pattern.pattern
+                                break
+                            }
                         }
                     }
                 }
@@ -206,6 +215,24 @@ func processCommands(
                 record.recordVisit()
                 mutableState.visitRecords.append(record)
                 print("[WillpowerDaemon] New visit record created for pattern \(patternId)")
+            }
+            mutableState.lastUpdated = Date()
+
+        case .updateIndependentTriggers(let triggers):
+            // GUARD: Don't process empty updates if we have existing data
+            if triggers.isEmpty && !mutableState.independentTriggers.isEmpty {
+                print("[WillpowerDaemon] SKIPPED: updateIndependentTriggers with empty array (preserving existing \(mutableState.independentTriggers.count) triggers)")
+                break
+            }
+            mutableState.independentTriggers = triggers
+            mutableState.lastUpdated = Date()
+            print("[WillpowerDaemon] Updated independent triggers: \(triggers.count) trigger(s)")
+
+        case .deleteIndependentTrigger(let triggerId):
+            let beforeCount = mutableState.independentTriggers.count
+            mutableState.independentTriggers.removeAll { $0.id == triggerId }
+            if beforeCount > mutableState.independentTriggers.count {
+                print("[WillpowerDaemon] Deleted independent trigger \(triggerId)")
             }
             mutableState.lastUpdated = Date()
         }
@@ -322,11 +349,14 @@ func evaluateTriggers(
 ) -> WillpowerState {
     var mutableState = state
 
+    // PART 1: Evaluate independent triggers (new architecture)
+    mutableState = evaluateIndependentTriggers(state: mutableState)
+
+    // PART 2: Evaluate blocklist schedule triggers (legacy, still useful)
     for (idx, blocklist) in mutableState.blocklists.enumerated() {
-        // Skip if blocklist has no evaluatable triggers
-        let hasVisitTrigger = blocklist.triggers.contains { $0.type == .visitCount && $0.isEnabled }
+        // Only handle schedule-based triggers here (visit-count now independent)
         let hasScheduleTrigger = blocklist.triggers.contains { $0.type == .scheduleBased && $0.isEnabled }
-        guard hasVisitTrigger || hasScheduleTrigger else { continue }
+        guard hasScheduleTrigger else { continue }
 
         // Check if already has an active block
         let existingBlock = mutableState.activeBlocks.first { $0.blocklistId == blocklist.id }
@@ -334,32 +364,7 @@ func evaluateTriggers(
             continue  // Already blocked
         }
 
-        // Evaluate visit-count triggers
-        for trigger in blocklist.triggers where trigger.type == .visitCount && trigger.isEnabled {
-            let result = triggerEvaluator.evaluateTrigger(trigger, visitRecords: mutableState.visitRecords)
-
-            if case .active(let expiresAt) = result {
-                // Threshold exceeded - activate block
-                print("[WillpowerDaemon] Visit threshold exceeded for '\(blocklist.name)' - activating block")
-
-                let block = ActiveBlock(
-                    blocklistId: blocklist.id,
-                    domains: blocklist.domains,
-                    expiresAt: expiresAt,
-                    reason: .visitCountTrigger,
-                    isLocked: true  // Visit-triggered blocks are always locked
-                )
-
-                mutableState.activeBlocks.removeAll { $0.blocklistId == blocklist.id }
-                mutableState.activeBlocks.append(block)
-                mutableState.blocklists[idx].isActive = true
-                mutableState.lastUpdated = Date()
-
-                break  // Only need one active block per blocklist
-            }
-        }
-
-        // Also check schedule-based triggers
+        // Check schedule-based triggers
         for trigger in blocklist.triggers where trigger.type == .scheduleBased && trigger.isEnabled {
             let result = triggerEvaluator.evaluateTrigger(trigger, visitRecords: mutableState.visitRecords)
 
@@ -386,6 +391,97 @@ func evaluateTriggers(
                 }
 
                 break
+            }
+        }
+    }
+
+    return mutableState
+}
+
+/// Evaluate independent visit-count triggers
+func evaluateIndependentTriggers(state: WillpowerState) -> WillpowerState {
+    var mutableState = state
+
+    for trigger in mutableState.independentTriggers where trigger.isEnabled {
+        // Calculate total visits for this trigger's patterns
+        var totalVisits = 0
+        for pattern in trigger.urlPatterns {
+            if let record = mutableState.visitRecords.first(where: { $0.patternId == pattern.id }) {
+                totalVisits += record.visitCount
+            }
+        }
+
+        // Check if threshold exceeded
+        guard totalVisits >= trigger.maxVisits else { continue }
+
+        // Process each pattern's block action
+        for pattern in trigger.urlPatterns {
+            // Check if this pattern already has an active block
+            let patternBlockId = pattern.id  // Use pattern ID as block identifier
+            let existingBlock = mutableState.activeBlocks.first {
+                $0.blocklistId == patternBlockId && !$0.isExpired
+            }
+
+            if existingBlock != nil {
+                continue  // Already blocked
+            }
+
+            let expiresAt = Date().addingTimeInterval(TimeInterval(trigger.blockDurationSeconds))
+
+            switch pattern.blockAction {
+            case .blockDomain:
+                // Block just the pattern's associated domain
+                print("[WillpowerDaemon] Visit threshold exceeded - blocking domain '\(pattern.associatedDomain)'")
+
+                let block = ActiveBlock(
+                    blocklistId: pattern.id,  // Use pattern ID to track this specific block
+                    domains: [pattern.associatedDomain],
+                    expiresAt: expiresAt,
+                    reason: .visitCountTrigger,
+                    isLocked: true
+                )
+
+                mutableState.activeBlocks.append(block)
+                mutableState.lastUpdated = Date()
+
+            case .activateBlocklist(let blocklistId):
+                // Activate the specified blocklist
+                if let blocklist = mutableState.blocklists.first(where: { $0.id == blocklistId }) {
+                    // Check if blocklist already has an active block
+                    let existingBlocklistBlock = mutableState.activeBlocks.first {
+                        $0.blocklistId == blocklistId && !$0.isExpired
+                    }
+
+                    if existingBlocklistBlock == nil {
+                        print("[WillpowerDaemon] Visit threshold exceeded - activating blocklist '\(blocklist.name)'")
+
+                        let block = ActiveBlock(
+                            blocklistId: blocklistId,
+                            domains: blocklist.domains,
+                            expiresAt: expiresAt,
+                            reason: .visitCountTrigger,
+                            isLocked: true
+                        )
+
+                        mutableState.activeBlocks.append(block)
+
+                        // Mark blocklist as active
+                        if let idx = mutableState.blocklists.firstIndex(where: { $0.id == blocklistId }) {
+                            mutableState.blocklists[idx].isActive = true
+                        }
+
+                        mutableState.lastUpdated = Date()
+                    }
+                } else {
+                    print("[WillpowerDaemon] WARNING: Blocklist \(blocklistId) not found for trigger activation")
+                }
+            }
+        }
+
+        // Reset visit counts after triggering
+        for pattern in trigger.urlPatterns {
+            if let idx = mutableState.visitRecords.firstIndex(where: { $0.patternId == pattern.id }) {
+                mutableState.visitRecords[idx].reset()
             }
         }
     }

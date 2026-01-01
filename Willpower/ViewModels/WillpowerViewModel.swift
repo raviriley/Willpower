@@ -41,6 +41,9 @@ final class WillpowerViewModel {
     /// All configured blocklists
     var blocklists: [BlocklistConfig] = []
 
+    /// Independent visit-count triggers (not attached to blocklists)
+    var independentTriggers: [IndependentTrigger] = []
+
     /// Currently active blocks being enforced
     var activeBlocks: [ActiveBlock] = []
 
@@ -80,6 +83,8 @@ final class WillpowerViewModel {
 
     /// Local storage key for blocklists (fallback when IPC unavailable)
     private let localBlocklistsKey = "willpower.local.blocklists"
+    /// Local storage key for independent triggers
+    private let localTriggersKey = "willpower.local.triggers"
 
     // MARK: - Initialization
 
@@ -118,11 +123,18 @@ final class WillpowerViewModel {
            let saved = try? JSONDecoder().decode([BlocklistConfig].self, from: data) {
             blocklists = saved
         }
+        if let data = UserDefaults.standard.data(forKey: localTriggersKey),
+           let saved = try? JSONDecoder().decode([IndependentTrigger].self, from: data) {
+            independentTriggers = saved
+        }
     }
 
     private func saveLocalState() {
         if let data = try? JSONEncoder().encode(blocklists) {
             UserDefaults.standard.set(data, forKey: localBlocklistsKey)
+        }
+        if let data = try? JSONEncoder().encode(independentTriggers) {
+            UserDefaults.standard.set(data, forKey: localTriggersKey)
         }
     }
 
@@ -146,11 +158,9 @@ final class WillpowerViewModel {
         }
     }
 
-    /// Check if any blocklist has visit-count triggers
+    /// Check if there are any enabled independent visit-count triggers
     private var hasVisitCountTriggers: Bool {
-        blocklists.contains { blocklist in
-            blocklist.triggers.contains { $0.type == .visitCount && $0.isEnabled }
-        }
+        independentTriggers.contains { $0.isEnabled }
     }
 
     /// Stop state synchronization
@@ -183,16 +193,12 @@ final class WillpowerViewModel {
         }
     }
 
-    /// Configure browser monitor with URL patterns from all visit-count triggers
+    /// Configure browser monitor with URL patterns from all independent triggers
     private func configureBrowserMonitorPatterns() async {
         var patterns: [URLPattern] = []
 
-        for blocklist in blocklists {
-            for trigger in blocklist.triggers where trigger.type == .visitCount && trigger.isEnabled {
-                if let visitConfig = trigger.visitCount {
-                    patterns.append(contentsOf: visitConfig.urlPatterns)
-                }
-            }
+        for trigger in independentTriggers where trigger.isEnabled {
+            patterns.append(contentsOf: trigger.urlPatterns)
         }
 
         await browserMonitor.setPatterns(patterns)
@@ -235,7 +241,7 @@ final class WillpowerViewModel {
         lastDaemonHeartbeat = ipcManager.lastDaemonHeartbeat()
 
         // Only sync FROM daemon if it's actually running
-        // This prevents empty IPC state from overwriting local blocklists
+        // This prevents empty IPC state from overwriting local data
         if isDaemonRunning {
             let state = ipcManager.loadStateOrDefault()
 
@@ -243,15 +249,21 @@ final class WillpowerViewModel {
             // or if we have no local data
             if !state.blocklists.isEmpty || blocklists.isEmpty {
                 blocklists = state.blocklists
-                saveLocalState() // Keep local storage in sync
             }
+
+            // Sync independent triggers from daemon
+            if !state.independentTriggers.isEmpty || independentTriggers.isEmpty {
+                independentTriggers = state.independentTriggers
+            }
+
+            saveLocalState() // Keep local storage in sync
 
             activeBlocks = state.activeBlocks.filter { !$0.isExpired }
             visitRecords = state.visitRecords
             daemonVersion = state.daemonVersion
         } else {
             // Daemon not running - just ensure local state is loaded
-            if blocklists.isEmpty {
+            if blocklists.isEmpty || independentTriggers.isEmpty {
                 loadLocalState()
             }
             activeBlocks = []
@@ -393,41 +405,73 @@ final class WillpowerViewModel {
         }
     }
 
-    // MARK: - Visit-Count Trigger Management
+    // MARK: - Independent Trigger Management
 
-    /// Add a visit-count trigger to a blocklist
-    func addVisitTrigger(to blocklist: BlocklistConfig, trigger: VisitCountTrigger) {
-        guard var updated = blocklists.first(where: { $0.id == blocklist.id }) else { return }
+    /// Create a new independent trigger
+    func createIndependentTrigger(_ trigger: IndependentTrigger) {
+        // Update local state first
+        independentTriggers.append(trigger)
+        saveLocalState()
 
-        let config = TriggerConfig.visitCount(trigger)
-        updated.triggers.append(config)
-        updateBlocklist(updated)
+        // Try to sync to IPC (best effort)
+        syncTriggersToIPC()
+
+        // Reconfigure browser monitor with new patterns
+        reconfigureBrowserMonitor()
+
+        // Start browser monitoring if not already running
+        if !isBrowserMonitoringActive && trigger.isEnabled {
+            startBrowserMonitoring()
+        }
     }
 
-    /// Remove a visit-count trigger from a blocklist
-    func removeVisitTrigger(triggerId: UUID, from blocklist: BlocklistConfig) {
-        guard var updated = blocklists.first(where: { $0.id == blocklist.id }) else { return }
-        updated.triggers.removeAll { $0.id == triggerId }
-        updateBlocklist(updated)
+    /// Update an existing independent trigger
+    func updateIndependentTrigger(_ trigger: IndependentTrigger) {
+        guard let index = independentTriggers.firstIndex(where: { $0.id == trigger.id }) else { return }
+
+        var updated = trigger
+        updated.updatedAt = Date()
+
+        // Update local state first
+        independentTriggers[index] = updated
+        saveLocalState()
+
+        // Try to sync to IPC
+        syncTriggersToIPC()
+
+        // Reconfigure browser monitor with updated patterns
+        reconfigureBrowserMonitor()
     }
 
-    /// Update an existing visit-count trigger
-    func updateVisitTrigger(triggerId: UUID, in blocklist: BlocklistConfig, newTrigger: VisitCountTrigger) {
-        guard var updated = blocklists.first(where: { $0.id == blocklist.id }) else { return }
+    /// Delete an independent trigger
+    func deleteIndependentTrigger(_ trigger: IndependentTrigger) {
+        // Update local state first
+        independentTriggers.removeAll { $0.id == trigger.id }
+        saveLocalState()
 
-        // Find and update the trigger
-        if let idx = updated.triggers.firstIndex(where: { $0.id == triggerId }) {
-            // Preserve the trigger ID and enabled state
-            let wasEnabled = updated.triggers[idx].isEnabled
-            // Create new trigger with same ID
-            let updatedTrigger = TriggerConfig(
-                id: triggerId,
-                type: .visitCount,
-                visitCount: newTrigger,
-                isEnabled: wasEnabled
-            )
-            updated.triggers[idx] = updatedTrigger
-            updateBlocklist(updated)
+        // Try to sync to IPC
+        do {
+            try ipcManager.deleteIndependentTrigger(triggerId: trigger.id)
+        } catch {
+            print("[WillpowerViewModel] IPC delete trigger failed: \(error.localizedDescription)")
+        }
+
+        // Reconfigure browser monitor
+        reconfigureBrowserMonitor()
+
+        // Stop browser monitoring if no more triggers
+        if independentTriggers.isEmpty {
+            stopBrowserMonitoring()
+        }
+    }
+
+    /// Sync current independent triggers to IPC (best effort, doesn't fail UI)
+    private func syncTriggersToIPC() {
+        do {
+            try ipcManager.updateIndependentTriggers(independentTriggers)
+        } catch {
+            // Log but don't show error to user - local state is saved
+            print("[WillpowerViewModel] IPC trigger sync failed: \(error.localizedDescription)")
         }
     }
 
@@ -479,11 +523,6 @@ final class WillpowerViewModel {
         blocklist.triggers.filter { $0.type == .scheduleBased }
     }
 
-    /// Get visit-count triggers for a blocklist
-    func visitCountTriggers(for blocklist: BlocklistConfig) -> [TriggerConfig] {
-        blocklist.triggers.filter { $0.type == .visitCount }
-    }
-
     /// All schedule triggers across all blocklists
     var allScheduleTriggers: [(blocklist: BlocklistConfig, trigger: TriggerConfig)] {
         blocklists.flatMap { blocklist in
@@ -491,11 +530,9 @@ final class WillpowerViewModel {
         }
     }
 
-    /// All visit-count triggers across all blocklists
-    var allVisitCountTriggers: [(blocklist: BlocklistConfig, trigger: TriggerConfig)] {
-        blocklists.flatMap { blocklist in
-            visitCountTriggers(for: blocklist).map { (blocklist, $0) }
-        }
+    /// All enabled independent triggers
+    var allIndependentTriggers: [IndependentTrigger] {
+        independentTriggers
     }
 
     // MARK: - Helpers

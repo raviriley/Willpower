@@ -10,45 +10,45 @@ import WillpowerKit
 
 struct TriggerEditorSheet: View {
     @Bindable var viewModel: WillpowerViewModel
-    let blocklist: BlocklistConfig
     /// Existing trigger to edit (nil for new trigger)
-    let existingTrigger: TriggerConfig?
+    let existingTrigger: IndependentTrigger?
 
     @Environment(\.dismiss) private var dismiss
 
+    @State private var triggerName: String = ""
     @State private var urlPatterns: [URLPattern] = []
     @State private var maxVisits: Int = 5
     @State private var blockDurationMinutes: Int = 60
-    @State private var resetIntervalHours: Int? = nil
 
     @State private var newPattern: String = ""
     @State private var newPatternIsRegex: Bool = false
+    @State private var newPatternBlockAction: BlockAction = .blockDomain
+    @State private var newPatternBlocklistId: UUID?
 
     var isEditing: Bool { existingTrigger != nil }
 
     /// Check if this trigger has caused an active block right now
     var isTriggerActive: Bool {
-        guard existingTrigger != nil else { return false }
-        return viewModel.activeBlocks.contains {
-            $0.blocklistId == blocklist.id &&
-            $0.reason == .visitCountTrigger &&
-            !$0.isExpired
+        guard let trigger = existingTrigger else { return false }
+        for pattern in trigger.urlPatterns {
+            if viewModel.activeBlocks.contains(where: { $0.blocklistId == pattern.id && !$0.isExpired }) {
+                return true
+            }
         }
+        return false
     }
 
-    init(viewModel: WillpowerViewModel, blocklist: BlocklistConfig, existingTrigger: TriggerConfig? = nil) {
+    init(viewModel: WillpowerViewModel, existingTrigger: IndependentTrigger? = nil) {
         self.viewModel = viewModel
-        self.blocklist = blocklist
         self.existingTrigger = existingTrigger
     }
 
     var body: some View {
         NavigationStack {
             Form {
-                // Blocklist Info
-                Section("Blocklist") {
-                    LabeledContent("Name", value: blocklist.name)
-                    LabeledContent("Domains", value: "\(blocklist.domains.count)")
+                // Trigger Name
+                Section("Trigger Name") {
+                    TextField("Name (e.g., Social Media Limit)", text: $triggerName)
                 }
 
                 // Active trigger warning
@@ -60,7 +60,7 @@ struct TriggerEditorSheet: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("Trigger is Currently Active")
                                     .font(.headline)
-                                Text("This blocklist was activated by this trigger. Changes will take effect after the block expires.")
+                                Text("This trigger has been activated. Changes will take effect after the block expires.")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
@@ -72,30 +72,32 @@ struct TriggerEditorSheet: View {
                 // URL Patterns Section
                 Section("URL Patterns to Monitor") {
                     ForEach(urlPatterns) { pattern in
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(pattern.pattern)
-                                    .font(.system(.body, design: .monospaced))
-                                HStack(spacing: 8) {
-                                    Text(pattern.isRegex ? "Regex" : "Contains")
-                                        .font(.caption2)
-                                        .padding(.horizontal, 6)
-                                        .padding(.vertical, 2)
-                                        .background(Color.secondary.opacity(0.2))
-                                        .clipShape(Capsule())
-                                    Text("→ blocks \(pattern.associatedDomain)")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(pattern.pattern)
+                                        .font(.system(.body, design: .monospaced))
+                                    HStack(spacing: 8) {
+                                        Text(pattern.isRegex ? "Regex" : "Contains")
+                                            .font(.caption2)
+                                            .padding(.horizontal, 6)
+                                            .padding(.vertical, 2)
+                                            .background(Color.secondary.opacity(0.2))
+                                            .clipShape(Capsule())
+                                        Text(blockActionDescription(for: pattern))
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
                                 }
+                                Spacer()
+                                Button(role: .destructive) {
+                                    urlPatterns.removeAll { $0.id == pattern.id }
+                                } label: {
+                                    Image(systemName: "minus.circle.fill")
+                                        .foregroundStyle(.red)
+                                }
+                                .buttonStyle(.plain)
                             }
-                            Spacer()
-                            Button(role: .destructive) {
-                                urlPatterns.removeAll { $0.id == pattern.id }
-                            } label: {
-                                Image(systemName: "minus.circle.fill")
-                                    .foregroundStyle(.red)
-                            }
-                            .buttonStyle(.plain)
                         }
                     }
 
@@ -110,12 +112,21 @@ struct TriggerEditorSheet: View {
                                 .toggleStyle(.checkbox)
 
                             Spacer()
-
-                            Button("Add Pattern") {
-                                addPattern()
-                            }
-                            .disabled(newPattern.trimmingCharacters(in: .whitespaces).isEmpty)
                         }
+
+                        // Block Action Picker
+                        Picker("When triggered", selection: $newPatternBlockAction) {
+                            Text("Block domain").tag(BlockAction.blockDomain)
+                            ForEach(viewModel.blocklists) { blocklist in
+                                Text("Activate: \(blocklist.name)").tag(BlockAction.activateBlocklist(blocklistId: blocklist.id))
+                            }
+                        }
+                        .pickerStyle(.menu)
+
+                        Button("Add Pattern") {
+                            addPattern()
+                        }
+                        .disabled(newPattern.trimmingCharacters(in: .whitespaces).isEmpty)
                     }
                 }
 
@@ -132,14 +143,6 @@ struct TriggerEditorSheet: View {
                         Text("8 hours").tag(480)
                         Text("24 hours").tag(1440)
                     }
-
-                    Picker("Reset Counter After", selection: $resetIntervalHours) {
-                        Text("Never").tag(nil as Int?)
-                        Text("1 hour").tag(1 as Int?)
-                        Text("6 hours").tag(6 as Int?)
-                        Text("12 hours").tag(12 as Int?)
-                        Text("24 hours").tag(24 as Int?)
-                    }
                 }
 
                 Section {
@@ -151,15 +154,13 @@ struct TriggerEditorSheet: View {
                             Image(systemName: "info.circle")
                         }
 
-                        Text("When you visit URLs matching these patterns \(maxVisits) time\(maxVisits == 1 ? "" : "s"), the blocklist \"\(blocklist.name)\" will automatically activate for \(formatDuration(blockDurationMinutes * 60)).")
+                        Text("When you visit URLs matching these patterns \(maxVisits) time\(maxVisits == 1 ? "" : "s"), blocking will activate for \(formatDuration(blockDurationMinutes * 60)).")
                             .font(.callout)
                             .foregroundStyle(.secondary)
 
-                        if let resetHours = resetIntervalHours {
-                            Text("The visit counter will reset after \(resetHours) hour\(resetHours == 1 ? "" : "s") of not visiting.")
-                                .font(.callout)
-                                .foregroundStyle(.secondary)
-                        }
+                        Text("Each pattern can independently block its domain or activate a blocklist.")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
                     }
                 }
             }
@@ -175,17 +176,17 @@ struct TriggerEditorSheet: View {
                     Button(isEditing ? "Save" : "Create") {
                         saveTrigger()
                     }
-                    .disabled(urlPatterns.isEmpty)
+                    .disabled(urlPatterns.isEmpty || triggerName.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
             }
         }
         .frame(minWidth: 500, minHeight: 550)
         .onAppear {
-            if let trigger = existingTrigger, let vc = trigger.visitCount {
-                urlPatterns = vc.urlPatterns
-                maxVisits = vc.maxVisits
-                blockDurationMinutes = vc.blockDurationSeconds / 60
-                resetIntervalHours = vc.resetIntervalSeconds.map { $0 / 3600 }
+            if let trigger = existingTrigger {
+                triggerName = trigger.name
+                urlPatterns = trigger.urlPatterns
+                maxVisits = trigger.maxVisits
+                blockDurationMinutes = trigger.blockDurationSeconds / 60
             }
         }
     }
@@ -198,28 +199,51 @@ struct TriggerEditorSheet: View {
         let pattern = URLPattern(
             pattern: trimmed,
             isRegex: newPatternIsRegex,
-            associatedDomain: domain
+            associatedDomain: domain,
+            blockAction: newPatternBlockAction
         )
 
         urlPatterns.append(pattern)
         newPattern = ""
         newPatternIsRegex = false
+        newPatternBlockAction = .blockDomain
     }
 
     private func saveTrigger() {
-        let trigger = VisitCountTrigger(
-            urlPatterns: urlPatterns,
-            maxVisits: maxVisits,
-            blockDurationSeconds: blockDurationMinutes * 60,
-            resetIntervalSeconds: resetIntervalHours.map { $0 * 3600 }
-        )
+        let name = triggerName.trimmingCharacters(in: .whitespaces)
+        guard !name.isEmpty else { return }
 
         if let existingTrigger {
-            viewModel.updateVisitTrigger(triggerId: existingTrigger.id, in: blocklist, newTrigger: trigger)
+            // Update existing trigger
+            var updated = existingTrigger
+            updated.name = name
+            updated.urlPatterns = urlPatterns
+            updated.maxVisits = maxVisits
+            updated.blockDurationSeconds = blockDurationMinutes * 60
+            viewModel.updateIndependentTrigger(updated)
         } else {
-            viewModel.addVisitTrigger(to: blocklist, trigger: trigger)
+            // Create new trigger
+            let trigger = IndependentTrigger(
+                name: name,
+                urlPatterns: urlPatterns,
+                maxVisits: maxVisits,
+                blockDurationSeconds: blockDurationMinutes * 60
+            )
+            viewModel.createIndependentTrigger(trigger)
         }
         dismiss()
+    }
+
+    private func blockActionDescription(for pattern: URLPattern) -> String {
+        switch pattern.blockAction {
+        case .blockDomain:
+            return "→ blocks \(pattern.associatedDomain)"
+        case .activateBlocklist(let blocklistId):
+            if let blocklist = viewModel.blocklists.first(where: { $0.id == blocklistId }) {
+                return "→ activates \(blocklist.name)"
+            }
+            return "→ activates blocklist"
+        }
     }
 
     private func extractDomain(from pattern: String) -> String {
@@ -246,8 +270,5 @@ struct TriggerEditorSheet: View {
 }
 
 #Preview {
-    TriggerEditorSheet(
-        viewModel: WillpowerViewModel(),
-        blocklist: BlocklistConfig(name: "Social Media", domains: ["youtube.com"])
-    )
+    TriggerEditorSheet(viewModel: WillpowerViewModel())
 }

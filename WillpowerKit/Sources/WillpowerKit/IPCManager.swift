@@ -135,6 +135,18 @@ public final class IPCManager: @unchecked Sendable {
             }
         }
 
+        // DEDUPLICATION: For updateIndependentTriggers, remove any existing commands
+        if case .updateIndependentTriggers = command {
+            let beforeCount = commands.count
+            commands.removeAll { wrapper in
+                if case .updateIndependentTriggers = wrapper.command { return true }
+                return false
+            }
+            if beforeCount != commands.count {
+                print("[IPCManager] Deduplicated \(beforeCount - commands.count) stale updateIndependentTriggers command(s)")
+            }
+        }
+
         // Add new command with wrapper
         let wrapper = CommandWrapper(command: command)
         commands.append(wrapper)
@@ -290,6 +302,16 @@ public final class IPCManager: @unchecked Sendable {
     /// Report a URL visit (called by app which runs BrowserMonitor)
     public func reportVisit(patternId: UUID, url: String) throws {
         try queueCommand(.reportVisit(patternId: patternId, url: url))
+    }
+
+    /// Send updated independent triggers to daemon
+    public func updateIndependentTriggers(_ triggers: [IndependentTrigger]) throws {
+        try queueCommand(.updateIndependentTriggers(triggers))
+    }
+
+    /// Delete a specific independent trigger
+    public func deleteIndependentTrigger(triggerId: UUID) throws {
+        try queueCommand(.deleteIndependentTrigger(triggerId: triggerId))
     }
 
     // MARK: - Debug

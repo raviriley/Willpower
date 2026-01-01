@@ -84,6 +84,16 @@ public struct ScheduleBasedTrigger: Codable, Sendable, Equatable {
     }
 }
 
+// MARK: - Block Action
+
+/// Defines what happens when a trigger fires
+public enum BlockAction: Codable, Sendable, Hashable, Equatable {
+    /// Block the URL pattern's associated domain directly
+    case blockDomain
+    /// Activate a specific blocklist
+    case activateBlocklist(blocklistId: UUID)
+}
+
 // MARK: - URL Pattern
 
 /// Pattern for matching URLs (used in visit counting)
@@ -95,17 +105,21 @@ public struct URLPattern: Codable, Sendable, Equatable, Identifiable, Hashable {
     public var isRegex: Bool
     /// Domain to block when threshold is hit (e.g., "youtube.com")
     public var associatedDomain: String
+    /// What action to take when threshold is exceeded
+    public var blockAction: BlockAction
 
     public init(
         id: UUID = UUID(),
         pattern: String,
         isRegex: Bool = false,
-        associatedDomain: String
+        associatedDomain: String,
+        blockAction: BlockAction = .blockDomain
     ) {
         self.id = id
         self.pattern = pattern
         self.isRegex = isRegex
         self.associatedDomain = associatedDomain
+        self.blockAction = blockAction
     }
 
     /// Check if a URL matches this pattern
@@ -145,6 +159,50 @@ public struct VisitCountTrigger: Codable, Sendable, Equatable {
         self.maxVisits = maxVisits
         self.blockDurationSeconds = blockDurationSeconds
         self.resetIntervalSeconds = resetIntervalSeconds
+    }
+}
+
+// MARK: - Independent Trigger
+
+/// A standalone visit-count trigger that is not attached to a blocklist
+/// Each URL pattern can independently block its domain or activate a blocklist
+public struct IndependentTrigger: Codable, Sendable, Identifiable, Hashable, Equatable {
+    public var id: UUID
+    /// Display name for this trigger
+    public var name: String
+    /// URL patterns to monitor - each has its own blockAction
+    public var urlPatterns: [URLPattern]
+    /// Number of visits before blocking is triggered
+    public var maxVisits: Int
+    /// Time window for counting visits (in minutes, 0 = no window)
+    public var windowMinutes: Int
+    /// How long to block once triggered (in seconds)
+    public var blockDurationSeconds: Int
+    /// Whether this trigger is currently enabled
+    public var isEnabled: Bool
+    public var createdAt: Date
+    public var updatedAt: Date
+
+    public init(
+        id: UUID = UUID(),
+        name: String,
+        urlPatterns: [URLPattern],
+        maxVisits: Int,
+        windowMinutes: Int = 0,
+        blockDurationSeconds: Int,
+        isEnabled: Bool = true,
+        createdAt: Date = Date(),
+        updatedAt: Date = Date()
+    ) {
+        self.id = id
+        self.name = name
+        self.urlPatterns = urlPatterns
+        self.maxVisits = maxVisits
+        self.windowMinutes = windowMinutes
+        self.blockDurationSeconds = blockDurationSeconds
+        self.isEnabled = isEnabled
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
     }
 }
 
@@ -334,6 +392,8 @@ public struct VisitRecord: Codable, Sendable, Identifiable, Equatable {
 public struct WillpowerState: Codable, Sendable {
     /// All configured blocklists
     public var blocklists: [BlocklistConfig]
+    /// Independent visit-count triggers (not attached to blocklists)
+    public var independentTriggers: [IndependentTrigger]
     /// Currently active blocks being enforced
     public var activeBlocks: [ActiveBlock]
     /// Visit records for URL pattern tracking
@@ -345,12 +405,14 @@ public struct WillpowerState: Codable, Sendable {
 
     public init(
         blocklists: [BlocklistConfig] = [],
+        independentTriggers: [IndependentTrigger] = [],
         activeBlocks: [ActiveBlock] = [],
         visitRecords: [VisitRecord] = [],
         lastUpdated: Date = Date(),
         daemonVersion: String = "1.0.0"
     ) {
         self.blocklists = blocklists
+        self.independentTriggers = independentTriggers
         self.activeBlocks = activeBlocks
         self.visitRecords = visitRecords
         self.lastUpdated = lastUpdated
@@ -377,6 +439,10 @@ public enum DaemonCommand: Codable, Sendable {
     case deactivateBlocklist(blocklistId: UUID)
     /// Update all blocklist configurations
     case updateBlocklists([BlocklistConfig])
+    /// Update all independent triggers
+    case updateIndependentTriggers([IndependentTrigger])
+    /// Delete a specific independent trigger
+    case deleteIndependentTrigger(triggerId: UUID)
     /// Force state sync
     case forceSync
     /// Reset visit counts (nil = reset all)

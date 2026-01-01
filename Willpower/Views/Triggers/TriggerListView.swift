@@ -8,103 +8,70 @@
 import SwiftUI
 import WillpowerKit
 
-/// Model for editing an existing trigger (used for sheet item binding)
-struct TriggerEditItem: Identifiable {
-    let id = UUID()
-    let blocklist: BlocklistConfig
-    let trigger: TriggerConfig
-}
-
 struct TriggerListView: View {
     @Bindable var viewModel: WillpowerViewModel
 
-    @State private var selectedBlocklistForNewTrigger: BlocklistConfig?
-    @State private var triggerToEdit: TriggerEditItem?
+    @State private var isShowingNewTrigger = false
+    @State private var triggerToEdit: IndependentTrigger?
 
     var body: some View {
         List {
-            ForEach(viewModel.blocklists) { blocklist in
-                let triggers = viewModel.visitCountTriggers(for: blocklist)
-                if !triggers.isEmpty {
-                    Section(blocklist.name) {
-                        ForEach(triggers) { trigger in
-                            TriggerRowView(
-                                trigger: trigger,
-                                blocklist: blocklist,
-                                viewModel: viewModel
-                            )
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                triggerToEdit = TriggerEditItem(blocklist: blocklist, trigger: trigger)
-                            }
-                            .contextMenu {
-                                Button("Edit") {
-                                    triggerToEdit = TriggerEditItem(blocklist: blocklist, trigger: trigger)
-                                }
-                                Button("Reset Visit Count") {
-                                    if let vc = trigger.visitCount {
-                                        let patternIds = vc.urlPatterns.map { $0.id }
-                                        viewModel.resetVisitCounts(patternIds: patternIds)
-                                    }
-                                }
-                                Divider()
-                                Button("Delete", role: .destructive) {
-                                    viewModel.removeVisitTrigger(triggerId: trigger.id, from: blocklist)
-                                }
-                            }
+            ForEach(viewModel.independentTriggers) { trigger in
+                TriggerRowView(trigger: trigger, viewModel: viewModel)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        triggerToEdit = trigger
+                    }
+                    .contextMenu {
+                        Button("Edit") {
+                            triggerToEdit = trigger
+                        }
+                        Button("Reset Visit Count") {
+                            let patternIds = trigger.urlPatterns.map { $0.id }
+                            viewModel.resetVisitCounts(patternIds: patternIds)
+                        }
+                        Button(trigger.isEnabled ? "Disable" : "Enable") {
+                            var updated = trigger
+                            updated.isEnabled.toggle()
+                            viewModel.updateIndependentTrigger(updated)
+                        }
+                        Divider()
+                        Button("Delete", role: .destructive) {
+                            viewModel.deleteIndependentTrigger(trigger)
                         }
                     }
-                }
             }
         }
         .listStyle(.inset)
         .navigationTitle("Triggers")
         .toolbar {
             ToolbarItem {
-                Menu {
-                    ForEach(viewModel.blocklists) { blocklist in
-                        Button(blocklist.name) {
-                            selectedBlocklistForNewTrigger = blocklist
-                        }
-                    }
+                Button {
+                    isShowingNewTrigger = true
                 } label: {
                     Label("Add Trigger", systemImage: "plus")
                 }
-                .disabled(viewModel.blocklists.isEmpty)
             }
         }
         // Sheet for creating new triggers
-        .sheet(item: $selectedBlocklistForNewTrigger) { blocklist in
-            TriggerEditorSheet(viewModel: viewModel, blocklist: blocklist)
+        .sheet(isPresented: $isShowingNewTrigger) {
+            TriggerEditorSheet(viewModel: viewModel)
         }
         // Sheet for editing existing triggers
-        .sheet(item: $triggerToEdit) { editItem in
-            TriggerEditorSheet(
-                viewModel: viewModel,
-                blocklist: editItem.blocklist,
-                existingTrigger: editItem.trigger
-            )
+        .sheet(item: $triggerToEdit) { trigger in
+            TriggerEditorSheet(viewModel: viewModel, existingTrigger: trigger)
         }
         .overlay {
-            if viewModel.allVisitCountTriggers.isEmpty {
+            if viewModel.independentTriggers.isEmpty {
                 ContentUnavailableView {
                     Label("No Triggers", systemImage: "eye.trianglebadge.exclamationmark")
                 } description: {
                     Text("Create a visit-count trigger to automatically block sites after too many visits")
                 } actions: {
-                    if !viewModel.blocklists.isEmpty {
-                        Menu("Add Trigger") {
-                            ForEach(viewModel.blocklists) { blocklist in
-                                Button(blocklist.name) {
-                                    selectedBlocklistForNewTrigger = blocklist
-                                }
-                            }
-                        }
-                        .buttonStyle(.borderedProminent)
-                    } else {
-                        Text("Create a blocklist first")
-                            .foregroundStyle(.secondary)
+                    Button("Add Trigger") {
+                        isShowingNewTrigger = true
                     }
+                    .buttonStyle(.borderedProminent)
                 }
             }
         }
@@ -114,16 +81,26 @@ struct TriggerListView: View {
 // MARK: - Trigger Row View
 
 struct TriggerRowView: View {
-    let trigger: TriggerConfig
-    let blocklist: BlocklistConfig
+    let trigger: IndependentTrigger
     let viewModel: WillpowerViewModel
 
     /// Check if this trigger is currently active (caused a block)
     var isActive: Bool {
-        viewModel.activeBlocks.contains {
-            $0.blocklistId == blocklist.id &&
-            $0.reason == .visitCountTrigger &&
-            !$0.isExpired
+        for pattern in trigger.urlPatterns {
+            if viewModel.activeBlocks.contains(where: { $0.blocklistId == pattern.id && !$0.isExpired }) {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// Total visits for this trigger
+    var totalVisits: Int {
+        trigger.urlPatterns.reduce(0) { sum, pattern in
+            if let record = viewModel.visitRecords.first(where: { $0.patternId == pattern.id }) {
+                return sum + record.visitCount
+            }
+            return sum
         }
     }
 
@@ -134,38 +111,49 @@ struct TriggerRowView: View {
                 .font(.title2)
 
             VStack(alignment: .leading, spacing: 4) {
-                if let vc = trigger.visitCount {
-                    ForEach(vc.urlPatterns) { pattern in
-                        HStack {
-                            Text(pattern.pattern)
-                                .font(.system(.subheadline, design: .monospaced))
+                HStack {
+                    Text(trigger.name)
+                        .font(.headline)
 
-                            if let record = viewModel.visitRecords.first(where: { $0.patternId == pattern.id }) {
-                                Text("\(record.visitCount)/\(vc.maxVisits)")
-                                    .font(.caption)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(visitCountColor(record.visitCount, max: vc.maxVisits).opacity(0.2))
-                                    .foregroundStyle(visitCountColor(record.visitCount, max: vc.maxVisits))
-                                    .clipShape(Capsule())
-                            } else {
-                                Text("0/\(vc.maxVisits)")
-                                    .font(.caption)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(Color.green.opacity(0.2))
-                                    .foregroundStyle(.green)
-                                    .clipShape(Capsule())
-                            }
-                        }
+                    if !trigger.isEnabled {
+                        Text("Disabled")
+                            .font(.caption2)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.secondary.opacity(0.2))
+                            .clipShape(Capsule())
                     }
+                }
+
+                // Show patterns with visit counts
+                ForEach(trigger.urlPatterns) { pattern in
+                    HStack(spacing: 4) {
+                        Text(pattern.pattern)
+                            .font(.system(.caption, design: .monospaced))
+                            .foregroundStyle(.secondary)
+
+                        Text(blockActionBadge(for: pattern))
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+
+                HStack {
+                    // Visit count badge
+                    Text("\(totalVisits)/\(trigger.maxVisits)")
+                        .font(.caption)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(visitCountColor(totalVisits, max: trigger.maxVisits).opacity(0.2))
+                        .foregroundStyle(visitCountColor(totalVisits, max: trigger.maxVisits))
+                        .clipShape(Capsule())
 
                     if isActive {
-                        Text("Threshold reached - blocklist active")
+                        Text("Active")
                             .font(.caption)
                             .foregroundStyle(.red)
                     } else {
-                        Text("Block for \(formatDuration(vc.blockDurationSeconds)) when threshold reached")
+                        Text("Block for \(formatDuration(trigger.blockDurationSeconds))")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -179,6 +167,18 @@ struct TriggerRowView: View {
                 .foregroundStyle(.tertiary)
         }
         .padding(.vertical, 4)
+    }
+
+    private func blockActionBadge(for pattern: URLPattern) -> String {
+        switch pattern.blockAction {
+        case .blockDomain:
+            return "→ \(pattern.associatedDomain)"
+        case .activateBlocklist(let blocklistId):
+            if let blocklist = viewModel.blocklists.first(where: { $0.id == blocklistId }) {
+                return "→ \(blocklist.name)"
+            }
+            return "→ blocklist"
+        }
     }
 
     private func visitCountColor(_ count: Int, max: Int) -> Color {
