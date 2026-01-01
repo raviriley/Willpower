@@ -107,26 +107,61 @@ public final class HostsManager: Sendable {
 
     /// Flushes DNS cache after modifying hosts file
     /// This ensures changes take effect immediately
+    /// Note: This flushes system DNS cache but browsers may have their own caches
     public func flushDNSCache() throws {
-        // Flush the DNS cache
+        // Flush the system DNS cache
         let dscacheutil = Process()
         dscacheutil.executableURL = URL(fileURLWithPath: "/usr/bin/dscacheutil")
         dscacheutil.arguments = ["-flushcache"]
         try dscacheutil.run()
         dscacheutil.waitUntilExit()
 
-        // Also signal mDNSResponder to reload
-        let killall = Process()
-        killall.executableURL = URL(fileURLWithPath: "/usr/bin/killall")
-        killall.arguments = ["-HUP", "mDNSResponder"]
-        try? killall.run()  // May fail if mDNSResponder isn't running, that's OK
-        killall.waitUntilExit()
+        // Signal mDNSResponder to reload (primary DNS resolver on macOS)
+        let killallMDNS = Process()
+        killallMDNS.executableURL = URL(fileURLWithPath: "/usr/bin/killall")
+        killallMDNS.arguments = ["-HUP", "mDNSResponder"]
+        try? killallMDNS.run()
+        killallMDNS.waitUntilExit()
+
+        // Also restart mDNSResponderHelper if it exists (helps with some macOS versions)
+        let killallHelper = Process()
+        killallHelper.executableURL = URL(fileURLWithPath: "/usr/bin/killall")
+        killallHelper.arguments = ["-HUP", "mDNSResponderHelper"]
+        try? killallHelper.run()
+        killallHelper.waitUntilExit()
+
+        // Flush the DNS service discovery daemon
+        let discoveryKill = Process()
+        discoveryKill.executableURL = URL(fileURLWithPath: "/usr/bin/killall")
+        discoveryKill.arguments = ["-HUP", "discoveryd"]
+        try? discoveryKill.run()  // Only exists on older macOS
+        discoveryKill.waitUntilExit()
+
+        // Use lookupd flush for older compatibility
+        let lookupdFlush = Process()
+        lookupdFlush.executableURL = URL(fileURLWithPath: "/usr/sbin/lookupd")
+        lookupdFlush.arguments = ["-flushcache"]
+        try? lookupdFlush.run()  // Only exists on very old macOS
+        lookupdFlush.waitUntilExit()
+
+        print("[HostsManager] DNS cache flushed")
+    }
+
+    /// Note about browser DNS caches
+    /// Browser DNS caches are handled by the PF firewall layer which blocks
+    /// at the network level regardless of cached DNS entries.
+    public func attemptBrowserDNSFlush() {
+        // Browser DNS caches are now bypassed by the PF firewall layer
+        // which blocks TCP/UDP connections by IP address.
+        // No AppKit/AppleScript needed - this runs safely in daemon context.
+        print("[HostsManager] Note: Browser DNS caches bypassed via PF firewall")
     }
 
     /// Convenience method to apply domains and flush DNS in one call
     public func applyBlocklistAndFlush(domains: [String]) throws {
         try applyBlocklist(domains: domains)
         try flushDNSCache()
+        attemptBrowserDNSFlush()
     }
 
     // MARK: - Private Helpers

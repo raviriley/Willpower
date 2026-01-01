@@ -21,8 +21,12 @@ if getuid() != 0 {
 
 // Initialize components
 let hostsManager = HostsManager()
+let packetFilterManager = PacketFilterManager()
 let ipcManager = IPCManager()
 let triggerEvaluator = TriggerEvaluator()
+
+/// Track previous blocked domains to detect changes (must be before dispatchMain)
+var previousBlockedDomains = Set<String>()
 
 // NOTE: BrowserMonitor runs in the app, not the daemon.
 // The daemon runs as root and doesn't have access to user's GUI session
@@ -73,8 +77,12 @@ Task {
             // Clean up expired blocks
             state = cleanupExpiredBlocks(state: state)
 
-            // Apply hosts file changes
-            try applyHostsBlocks(state: state, hostsManager: hostsManager)
+            // Apply dual-layer blocking (hosts file + pf firewall)
+            try applyBlocks(
+                state: state,
+                hostsManager: hostsManager,
+                packetFilterManager: packetFilterManager
+            )
 
             // Save state
             try ipcManager.saveState(state)
@@ -517,9 +525,13 @@ func cleanupExpiredBlocks(state: WillpowerState) -> WillpowerState {
     return mutableState
 }
 
-// MARK: - Hosts File Application
+// MARK: - Dual-Layer Blocking (Hosts + PF Firewall)
 
-func applyHostsBlocks(state: WillpowerState, hostsManager: HostsManager) throws {
+func applyBlocks(
+    state: WillpowerState,
+    hostsManager: HostsManager,
+    packetFilterManager: PacketFilterManager
+) throws {
     // Collect all domains from active non-expired blocks
     var allDomains = Set<String>()
 
@@ -529,30 +541,38 @@ func applyHostsBlocks(state: WillpowerState, hostsManager: HostsManager) throws 
         }
     }
 
-    // Get currently blocked domains
-    let currentDomains: Set<String>
+    // Check if domains changed
+    guard allDomains != previousBlockedDomains else {
+        return  // No change, skip updates
+    }
+
+    print("[WillpowerDaemon] Block state changed. Now blocking \(allDomains.count) domain(s)")
+
+    // LAYER 1: Hosts file blocking
     do {
-        currentDomains = Set(try hostsManager.readManagedDomains().map { $0.lowercased() })
+        try hostsManager.applyBlocklistAndFlush(domains: Array(allDomains))
+        print("[WillpowerDaemon] ✓ Layer 1: Hosts file updated")
     } catch HostsManager.HostsError.permissionDenied {
-        print("[WillpowerDaemon] Cannot read hosts file - permission denied (not running as root)")
-        return
+        print("[WillpowerDaemon] ✗ Layer 1: Hosts file - permission denied (not running as root)")
+    } catch {
+        print("[WillpowerDaemon] ✗ Layer 1: Hosts file error - \(error)")
     }
 
-    // Normalize current domains (remove www. prefixes for comparison)
-    let normalizedCurrent = Set(currentDomains.map { domain -> String in
-        domain.hasPrefix("www.") ? String(domain.dropFirst(4)) : domain
-    })
-
-    // Only update if there's a change
-    if allDomains != normalizedCurrent {
-        print("[WillpowerDaemon] Updating hosts file. Blocking \(allDomains.count) domain(s)")
-
-        do {
-            try hostsManager.applyBlocklistAndFlush(domains: Array(allDomains))
-            print("[WillpowerDaemon] Hosts file updated and DNS cache flushed")
-        } catch HostsManager.HostsError.permissionDenied {
-            print("[WillpowerDaemon] ERROR: Cannot write hosts file - permission denied")
-            print("[WillpowerDaemon] Daemon must run as root to modify /etc/hosts")
+    // LAYER 2: PF firewall blocking (network-level, bypasses browser DNS cache)
+    do {
+        if allDomains.isEmpty {
+            try packetFilterManager.stopBlock()
+            print("[WillpowerDaemon] ✓ Layer 2: PF firewall rules cleared")
+        } else {
+            try packetFilterManager.startBlock(domains: Array(allDomains))
+            print("[WillpowerDaemon] ✓ Layer 2: PF firewall rules applied")
         }
+    } catch PacketFilterManager.PFError.permissionDenied {
+        print("[WillpowerDaemon] ✗ Layer 2: PF firewall - permission denied (not running as root)")
+    } catch {
+        print("[WillpowerDaemon] ✗ Layer 2: PF firewall error - \(error)")
     }
+
+    // Update tracking
+    previousBlockedDomains = allDomains
 }
