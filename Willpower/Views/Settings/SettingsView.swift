@@ -1,0 +1,298 @@
+//
+//  SettingsView.swift
+//  Willpower
+//
+//  Created by Ravi Riley on 1/1/26.
+//
+
+import SwiftUI
+import ServiceManagement
+import WillpowerKit
+import AppKit
+import UniformTypeIdentifiers
+
+struct SettingsView: View {
+    @Bindable var viewModel: WillpowerViewModel
+    @Bindable var daemonManager: DaemonManager
+
+    @State private var isShowingResetConfirmation = false
+    @State private var isShowingExportSheet = false
+    @State private var isShowingImportSheet = false
+    @State private var launchAtLogin = false
+
+    var body: some View {
+        Form {
+            // MARK: - Status Section
+            Section {
+                HStack {
+                    Label("Protection Status", systemImage: "shield.checkered")
+                    Spacer()
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(protectionStatusColor)
+                            .frame(width: 8, height: 8)
+                        Text(protectionStatusText)
+                            .foregroundStyle(protectionStatusColor)
+                    }
+                }
+
+                if !viewModel.isDaemonRunning {
+                    HStack {
+                        Text("The daemon is not running. Website blocking is inactive.")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Reinstall") {
+                            daemonManager.register()
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                    }
+                }
+
+                if let lastHeartbeat = viewModel.lastDaemonHeartbeat {
+                    HStack {
+                        Label("Last Active", systemImage: "clock")
+                        Spacer()
+                        Text(lastHeartbeat, style: .relative)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } header: {
+                Text("Status")
+            }
+
+            // MARK: - Preferences Section
+            Section {
+                Toggle(isOn: $launchAtLogin) {
+                    Label("Launch at Login", systemImage: "power")
+                }
+                .onChange(of: launchAtLogin) { _, newValue in
+                    setLaunchAtLogin(newValue)
+                }
+            } header: {
+                Text("Preferences")
+            }
+
+            // MARK: - Data Section
+            Section {
+                Button {
+                    exportBlocklists()
+                } label: {
+                    Label("Export Blocklists", systemImage: "square.and.arrow.up")
+                }
+                .buttonStyle(.borderless)
+
+                Button {
+                    isShowingImportSheet = true
+                } label: {
+                    Label("Import Blocklists", systemImage: "square.and.arrow.down")
+                }
+                .buttonStyle(.borderless)
+
+                Button(role: .destructive) {
+                    isShowingResetConfirmation = true
+                } label: {
+                    Label("Reset All Data", systemImage: "trash")
+                }
+                .buttonStyle(.borderless)
+                .disabled(hasLockedBlocks)
+            } header: {
+                Text("Data")
+            } footer: {
+                if hasLockedBlocks {
+                    Text("Cannot reset data while locked blocks are active.")
+                        .foregroundStyle(.orange)
+                }
+            }
+
+            // MARK: - About Section
+            Section {
+                HStack {
+                    Label("App Version", systemImage: "info.circle")
+                    Spacer()
+                    Text(appVersion)
+                        .foregroundStyle(.secondary)
+                }
+
+                if let daemonVersion = viewModel.daemonVersion {
+                    HStack {
+                        Label("Daemon Version", systemImage: "server.rack")
+                        Spacer()
+                        Text(daemonVersion)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                HStack {
+                    Label("Blocklists", systemImage: "list.bullet.rectangle")
+                    Spacer()
+                    Text("\(viewModel.blocklists.count)")
+                        .foregroundStyle(.secondary)
+                }
+
+                HStack {
+                    Label("Triggers", systemImage: "eye.trianglebadge.exclamationmark")
+                    Spacer()
+                    Text("\(viewModel.independentTriggers.count)")
+                        .foregroundStyle(.secondary)
+                }
+
+                Link(destination: URL(string: "https://github.com/raviriley/willpower")!) {
+                    Label("View on GitHub", systemImage: "link")
+                }
+                .buttonStyle(.borderless)
+            } header: {
+                Text("About")
+            }
+        }
+        .formStyle(.grouped)
+        .navigationTitle("Settings")
+        .onAppear {
+            loadLaunchAtLoginState()
+        }
+        .alert("Reset All Data?", isPresented: $isShowingResetConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Reset", role: .destructive) {
+                resetAllData()
+            }
+        } message: {
+            Text("This will delete all blocklists, triggers, and visit history. This action cannot be undone.")
+        }
+        .fileImporter(
+            isPresented: $isShowingImportSheet,
+            allowedContentTypes: [.json],
+            allowsMultipleSelection: false
+        ) { result in
+            handleImport(result)
+        }
+    }
+
+    // MARK: - Computed Properties
+
+    private var protectionStatusColor: Color {
+        if viewModel.isDaemonRunning {
+            return viewModel.activeBlocks.isEmpty ? .green : .blue
+        }
+        return .red
+    }
+
+    private var protectionStatusText: String {
+        if viewModel.isDaemonRunning {
+            if viewModel.activeBlocks.isEmpty {
+                return "Ready"
+            } else {
+                return "Blocking \(viewModel.totalDomainsBlocked) domains"
+            }
+        }
+        return "Not Protected"
+    }
+
+    private var hasLockedBlocks: Bool {
+        viewModel.activeBlocks.contains { $0.isLocked && !$0.isExpired }
+    }
+
+    private var appVersion: String {
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
+        return "\(version) (\(build))"
+    }
+
+    // MARK: - Actions
+
+    private func loadLaunchAtLoginState() {
+        launchAtLogin = SMAppService.mainApp.status == .enabled
+    }
+
+    private func setLaunchAtLogin(_ enabled: Bool) {
+        do {
+            if enabled {
+                try SMAppService.mainApp.register()
+            } else {
+                try SMAppService.mainApp.unregister()
+            }
+        } catch {
+            print("[Settings] Failed to set launch at login: \(error)")
+            // Revert the toggle
+            launchAtLogin = !enabled
+        }
+    }
+
+    private func exportBlocklists() {
+        let exportData = ExportData(
+            blocklists: viewModel.blocklists,
+            triggers: viewModel.independentTriggers,
+            exportedAt: Date()
+        )
+
+        guard let jsonData = try? JSONEncoder().encode(exportData),
+              let jsonString = String(data: jsonData, encoding: .utf8) else {
+            return
+        }
+
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.json]
+        panel.nameFieldStringValue = "willpower-backup.json"
+        panel.title = "Export Blocklists"
+
+        if panel.runModal() == .OK, let url = panel.url {
+            try? jsonString.write(to: url, atomically: true, encoding: .utf8)
+        }
+    }
+
+    private func handleImport(_ result: Result<[URL], Error>) {
+        guard case .success(let urls) = result,
+              let url = urls.first else {
+            return
+        }
+
+        guard url.startAccessingSecurityScopedResource() else {
+            return
+        }
+        defer { url.stopAccessingSecurityScopedResource() }
+
+        guard let data = try? Data(contentsOf: url),
+              let importData = try? JSONDecoder().decode(ExportData.self, from: data) else {
+            viewModel.errorMessage = "Failed to import: Invalid file format"
+            return
+        }
+
+        // Merge imported blocklists (avoid duplicates by name)
+        for blocklist in importData.blocklists {
+            if !viewModel.blocklists.contains(where: { $0.name == blocklist.name }) {
+                viewModel.createBlocklist(name: blocklist.name, domains: blocklist.domains)
+            }
+        }
+
+        // Merge imported triggers (avoid duplicates by name)
+        for trigger in importData.triggers {
+            if !viewModel.independentTriggers.contains(where: { $0.name == trigger.name }) {
+                viewModel.createIndependentTrigger(trigger)
+            }
+        }
+    }
+
+    private func resetAllData() {
+        // Delete all blocklists
+        for blocklist in viewModel.blocklists {
+            viewModel.deleteBlocklist(blocklist)
+        }
+
+        // Delete all triggers
+        for trigger in viewModel.independentTriggers {
+            viewModel.deleteIndependentTrigger(trigger)
+        }
+    }
+}
+
+// MARK: - Export Data Model
+
+private struct ExportData: Codable {
+    let blocklists: [BlocklistConfig]
+    let triggers: [IndependentTrigger]
+    let exportedAt: Date
+}
+
+#Preview {
+    SettingsView(viewModel: WillpowerViewModel(), daemonManager: DaemonManager())
+}

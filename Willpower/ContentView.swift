@@ -10,12 +10,13 @@ import WillpowerKit
 
 struct ContentView: View {
     @Bindable var viewModel: WillpowerViewModel
+    @Environment(DaemonManager.self) private var daemonManager
 
     var body: some View {
         NavigationSplitView {
             SidebarView(selectedCategory: $viewModel.selectedCategory)
         } content: {
-            ContentListView(viewModel: viewModel)
+            ContentListView(viewModel: viewModel, daemonManager: daemonManager)
         } detail: {
             DetailView(viewModel: viewModel)
         }
@@ -41,6 +42,7 @@ struct ContentView: View {
 
 struct ContentListView: View {
     @Bindable var viewModel: WillpowerViewModel
+    @Bindable var daemonManager: DaemonManager
 
     var body: some View {
         Group {
@@ -54,7 +56,7 @@ struct ContentListView: View {
             case .triggers:
                 TriggerListView(viewModel: viewModel)
             case .settings:
-                SettingsListView(viewModel: viewModel)
+                SettingsView(viewModel: viewModel, daemonManager: daemonManager)
             }
         }
         .navigationSplitViewColumnWidth(min: 250, ideal: 300)
@@ -94,7 +96,7 @@ struct DetailView: View {
             case .triggers:
                 TriggerDetailPlaceholder()
             case .settings:
-                SettingsDetailPlaceholder()
+                EmptyView()
             }
         }
     }
@@ -122,40 +124,6 @@ struct TriggerDetailPlaceholder: View {
     }
 }
 
-struct SettingsListView: View {
-    var viewModel: WillpowerViewModel
-
-    var body: some View {
-        List {
-            NavigationLink {
-                Text("General Settings")
-            } label: {
-                Label("General", systemImage: "gear")
-            }
-            NavigationLink {
-                Text("Daemon Settings")
-            } label: {
-                Label("Daemon", systemImage: "server.rack")
-            }
-            NavigationLink {
-                Text("Permissions")
-            } label: {
-                Label("Permissions", systemImage: "lock.shield")
-            }
-        }
-        .listStyle(.sidebar)
-    }
-}
-
-struct SettingsDetailPlaceholder: View {
-    var body: some View {
-        ContentUnavailableView(
-            "Settings",
-            systemImage: "gear",
-            description: Text("Select a settings category")
-        )
-    }
-}
 
 struct ActiveBlocksDetailView: View {
     var viewModel: WillpowerViewModel
@@ -196,4 +164,5 @@ struct ActiveBlocksDetailView: View {
 
 #Preview {
     ContentView(viewModel: WillpowerViewModel())
+        .environment(DaemonManager())
 }

@@ -193,8 +193,7 @@ TODOs are organized into two phases:
     - **Hide all daemon start/stop controls** - daemon is invisible
     - Only show "Reinstall Daemon" as last resort troubleshooting option
   - **Permissions Section**:
-    - Accessibility permission status + grant button
-    - Browser automation permissions
+    - Browser automation permissions (per-browser status)
   - **Preferences Section**:
     - Launch at login toggle (SMAppService.loginItem)
     - Notification preferences (block start/end)
