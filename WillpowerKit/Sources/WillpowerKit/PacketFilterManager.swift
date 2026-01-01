@@ -56,6 +56,15 @@ public final class PacketFilterManager: Sendable {
 
     // MARK: - Public API
 
+    /// iCloud Private Relay domains - blocking these disables Private Relay
+    /// This is necessary because Private Relay bypasses local network controls
+    private static let privateRelayDomains = [
+        "mask.icloud.com",
+        "mask-h2.icloud.com",
+        "mask-api.icloud.com",
+        "mask.apple-dns.net"
+    ]
+
     /// Start blocking the given domains using pf firewall
     /// - Parameter domains: Array of domain names to block
     public func startBlock(domains: [String]) throws {
@@ -76,6 +85,14 @@ public final class PacketFilterManager: Sendable {
             }
         }
 
+        // Also resolve and block iCloud Private Relay infrastructure
+        // This disables Private Relay so Safari respects our blocks
+        print("[PacketFilterManager] Blocking iCloud Private Relay to ensure Safari blocking works")
+        for relayDomain in Self.privateRelayDomains {
+            let relayIPs = resolveHostname(relayDomain)
+            allIPs.formUnion(relayIPs)
+        }
+
         guard !allIPs.isEmpty else {
             print("[PacketFilterManager] No IPs resolved for domains, skipping pf rules")
             return
@@ -93,7 +110,7 @@ public final class PacketFilterManager: Sendable {
         // Enable pf and load rules
         try enablePF()
 
-        print("[PacketFilterManager] Started blocking \(allIPs.count) IPs for \(domains.count) domains")
+        print("[PacketFilterManager] Started blocking \(allIPs.count) IPs for \(domains.count) domains (+ Private Relay)")
     }
 
     /// Stop all Willpower pf blocking
