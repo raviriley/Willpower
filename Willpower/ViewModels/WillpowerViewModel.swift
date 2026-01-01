@@ -327,6 +327,8 @@ final class WillpowerViewModel {
             try ipcManager.updateBlocklists(blocklists)
             // Also reconfigure browser monitor with new patterns
             reconfigureBrowserMonitor()
+            // Force immediate state sync to reflect changes
+            syncState()
         } catch {
             // Log but don't show error to user - local state is saved
             print("[WillpowerViewModel] IPC sync failed: \(error.localizedDescription)")
@@ -348,6 +350,8 @@ final class WillpowerViewModel {
 
         do {
             try ipcManager.activateBlocklist(blocklist.id, trigger: trigger, isLocked: isLocked)
+            // Force immediate state sync to reflect activation
+            syncState()
         } catch {
             errorMessage = "Failed to activate blocklist: \(error.localizedDescription)"
         }
@@ -362,6 +366,8 @@ final class WillpowerViewModel {
 
         do {
             try ipcManager.deactivateBlocklist(blocklist.id)
+            // Force immediate state sync to reflect deactivation
+            syncState()
         } catch {
             errorMessage = "Failed to deactivate blocklist: \(error.localizedDescription)"
         }
@@ -452,6 +458,8 @@ final class WillpowerViewModel {
         // Try to sync to IPC
         do {
             try ipcManager.deleteIndependentTrigger(triggerId: trigger.id)
+            // Force immediate state sync to reflect deletion
+            syncState()
         } catch {
             print("[WillpowerViewModel] IPC delete trigger failed: \(error.localizedDescription)")
         }
@@ -469,6 +477,8 @@ final class WillpowerViewModel {
     private func syncTriggersToIPC() {
         do {
             try ipcManager.updateIndependentTriggers(independentTriggers)
+            // Force immediate state sync to reflect changes
+            syncState()
         } catch {
             // Log but don't show error to user - local state is saved
             print("[WillpowerViewModel] IPC trigger sync failed: \(error.localizedDescription)")
@@ -484,6 +494,8 @@ final class WillpowerViewModel {
 
         do {
             try ipcManager.resetVisitCounts(patternIds: patternIds)
+            // Force immediate state sync to reflect reset
+            syncState()
         } catch {
             errorMessage = "Failed to reset visit counts: \(error.localizedDescription)"
         }
