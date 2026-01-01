@@ -148,34 +148,25 @@ TODOs are organized into two phases:
 ### 1.1 Critical Functionality
 
 #### Permissions & Setup
-- [ ] **Accessibility permission for BrowserMonitor** - Required for visit-count triggers:
-  - Add `NSAppleEventsUsageDescription` to Info.plist
-  - Check permission status on app launch with `AXIsProcessTrusted()`
-  - If not granted, show setup guide (not a dismissible prompt)
-  - **NO "Later" or "Skip" buttons** - user must grant or visit-count triggers are disabled
-  - Deep link to System Settings > Privacy & Security > Accessibility
-  - Gracefully degrade: if denied, hide/disable visit-count trigger UI entirely
+- [x] ~~**Accessibility permission for BrowserMonitor**~~ - **REMOVED**: Investigation revealed BrowserMonitor uses AppleScript, not Accessibility APIs. Accessibility permission is NOT required.
 
-- [ ] **Automation permission for AppleScript** - Required for browser URL polling:
-  - Add `NSAppleEventsUsageDescription` with clear explanation
-  - Request permission for Safari, Chrome, Arc, etc.
-  - Handle per-browser permission grants
+- [x] **Automation permission for AppleScript** - **ALREADY IMPLEMENTED**: macOS automatically prompts for Automation permission on first AppleScript execution. App has helper to open preferences if needed.
 
 #### Enable/Disable Toggles
-- [ ] **Implement schedule/trigger enable toggle** - Currently disabled with TODO:
-  - Add `toggleTriggerEnabled(triggerId:in:)` to ViewModel
-  - Send IPC command to daemon to update state
-  - UI: grayed out row with "Disabled" badge when `isEnabled: false`
-  - Disabled triggers should not activate blocks
+- [x] **Implement schedule/trigger enable toggle** - **ALREADY IMPLEMENTED**:
+  - Independent triggers: Context menu toggle in TriggerListView
+  - Schedules: TriggerConfig.isEnabled supported
+  - Visual indicator: Gray icon when disabled
+  - Functional: Browser monitoring respects isEnabled flag
 
 ### 1.2 UI/UX Polish
 
 #### Performance
-- [ ] **Fix 5-second UI update lag** - Changes should appear instantly:
-  - Current: ViewModel polls daemon state every 2 seconds
-  - After user action (create/edit/delete), force immediate sync
-  - Add `syncState()` call after all mutation methods
-  - Consider optimistic UI updates (update local state immediately, sync confirms)
+- [x] **Fix 5-second UI update lag** - **FIXED**: Added immediate `syncState()` calls after all IPC mutations:
+  - Blocklist create/update/delete
+  - Blocklist activate/deactivate
+  - Independent trigger create/update/delete
+  - Visit count reset
 
 - [ ] **Reduce daemon evaluation interval** - Currently 5 seconds:
   - For schedules: 5 seconds is acceptable
@@ -186,15 +177,14 @@ TODOs are organized into two phases:
 - [ ] **First-launch onboarding** - Guide user through setup:
   - Step 1: Welcome screen explaining what Willpower does
   - Step 2: Daemon installation (SMAppService approval in System Settings)
-  - Step 3: Accessibility permission (required, no skip)
-  - Step 4: Create first blocklist (guided)
+  - Step 3: Create first blocklist (guided)
   - **NO "Later" buttons** - each step must be completed or explicitly declined with consequences shown
   - Store onboarding completion state in UserDefaults
+  - Note: Automation permission (for browser monitoring) is prompted automatically by macOS on first use
 
 - [ ] **Permission status dashboard** - Show in Settings:
   - Daemon: Installed / Not Installed
-  - Accessibility: Granted / Not Granted (with "Fix" button)
-  - Each browser automation permission status
+  - Browser Automation: Shows which browsers have granted permission
 
 #### Settings View
 - [ ] **Implement Settings view** - Currently placeholder:
