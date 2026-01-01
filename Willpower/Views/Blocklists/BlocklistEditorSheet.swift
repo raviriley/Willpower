@@ -17,6 +17,7 @@ struct BlocklistEditorSheet: View {
     @State private var name: String = ""
     @State private var domains: [String] = []
     @State private var newDomain: String = ""
+    @State private var domainValidationError: String?
     /// Domains that existed when editing started (cannot be removed if active)
     @State private var originalDomains: Set<String> = []
 
@@ -89,17 +90,29 @@ struct BlocklistEditorSheet: View {
                         }
                     }
 
-                    HStack {
-                        TextField("Add domain (e.g., youtube.com)", text: $newDomain)
-                            .textFieldStyle(.plain)
-                            .onSubmit {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            TextField("Add domain (e.g., youtube.com)", text: $newDomain)
+                                .textFieldStyle(.plain)
+                                .onSubmit {
+                                    addDomain()
+                                }
+                                .onChange(of: newDomain) { _, _ in
+                                    // Clear error when user starts typing
+                                    domainValidationError = nil
+                                }
+
+                            Button("Add") {
                                 addDomain()
                             }
-
-                        Button("Add") {
-                            addDomain()
+                            .disabled(newDomain.trimmingCharacters(in: .whitespaces).isEmpty)
                         }
-                        .disabled(newDomain.trimmingCharacters(in: .whitespaces).isEmpty)
+
+                        if let error = domainValidationError {
+                            Text(error)
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                        }
                     }
                 }
 
@@ -109,7 +122,7 @@ struct BlocklistEditorSheet: View {
                             .font(.caption)
                             .foregroundStyle(.orange)
                     } else {
-                        Text("Enter domain names without http:// or www. prefix")
+                        Text("Enter domain names without http:// or www. prefix. You can also paste URLs and they will be cleaned automatically.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -144,12 +157,69 @@ struct BlocklistEditorSheet: View {
 
     private func addDomain() {
         let cleaned = cleanDomain(newDomain)
-        guard !cleaned.isEmpty, !domains.contains(cleaned) else {
+
+        // Validate the cleaned domain
+        if cleaned.isEmpty {
+            domainValidationError = "Please enter a domain"
+            return
+        }
+
+        if domains.contains(cleaned) {
+            domainValidationError = "This domain is already in the list"
             newDomain = ""
             return
         }
+
+        // Basic domain format validation
+        if let validationError = validateDomainFormat(cleaned) {
+            domainValidationError = validationError
+            return
+        }
+
         domains.append(cleaned)
         newDomain = ""
+        domainValidationError = nil
+    }
+
+    private func validateDomainFormat(_ domain: String) -> String? {
+        // Check for spaces
+        if domain.contains(" ") {
+            return "Domain cannot contain spaces"
+        }
+
+        // Check for basic domain format (at least one dot)
+        if !domain.contains(".") {
+            return "Invalid domain format. Example: youtube.com"
+        }
+
+        // Check for valid characters (alphanumeric, hyphens, dots)
+        let validCharacters = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-."))
+        if domain.unicodeScalars.contains(where: { !validCharacters.contains($0) }) {
+            return "Domain contains invalid characters"
+        }
+
+        // Check for consecutive dots or starting/ending with dot/hyphen
+        if domain.contains("..") {
+            return "Domain cannot contain consecutive dots"
+        }
+
+        if domain.hasPrefix(".") || domain.hasSuffix(".") {
+            return "Domain cannot start or end with a dot"
+        }
+
+        if domain.hasPrefix("-") || domain.hasSuffix("-") {
+            return "Domain cannot start or end with a hyphen"
+        }
+
+        // Check TLD exists (at least 2 characters after last dot)
+        if let lastDot = domain.lastIndex(of: ".") {
+            let tld = String(domain[domain.index(after: lastDot)...])
+            if tld.count < 2 {
+                return "Invalid top-level domain"
+            }
+        }
+
+        return nil
     }
 
     private func save() {

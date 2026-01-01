@@ -13,6 +13,7 @@ struct BlocklistDetailView: View {
     let blocklistId: UUID
 
     @State private var isShowingEditor = false
+    @State private var isShowingDeactivateConfirmation = false
 
     /// Get the current blocklist from viewModel (always fresh)
     var blocklist: BlocklistConfig? {
@@ -93,7 +94,7 @@ struct BlocklistDetailView: View {
                                 }
                             } else {
                                 Button("Deactivate", role: .destructive) {
-                                    viewModel.deactivateBlocklist(blocklist)
+                                    isShowingDeactivateConfirmation = true
                                 }
                             }
                         } else {
@@ -117,6 +118,14 @@ struct BlocklistDetailView: View {
                 }
                 .sheet(isPresented: $viewModel.isShowingActivationSheet) {
                     ManualActivationSheet(viewModel: viewModel, blocklistId: blocklistId)
+                }
+                .alert("Deactivate Block?", isPresented: $isShowingDeactivateConfirmation) {
+                    Button("Cancel", role: .cancel) { }
+                    Button("Deactivate", role: .destructive) {
+                        viewModel.deactivateBlocklist(blocklist)
+                    }
+                } message: {
+                    Text("This will immediately unblock all domains in \"\(blocklist.name)\". Are you sure?")
                 }
             } else {
                 ContentUnavailableView(

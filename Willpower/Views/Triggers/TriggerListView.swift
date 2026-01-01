@@ -13,6 +13,8 @@ struct TriggerListView: View {
 
     @State private var isShowingNewTrigger = false
     @State private var triggerToEdit: IndependentTrigger?
+    @State private var triggerToDelete: IndependentTrigger?
+    @State private var isShowingDeleteConfirmation = false
 
     var body: some View {
         List {
@@ -37,7 +39,8 @@ struct TriggerListView: View {
                         }
                         Divider()
                         Button("Delete", role: .destructive) {
-                            viewModel.deleteIndependentTrigger(trigger)
+                            triggerToDelete = trigger
+                            isShowingDeleteConfirmation = true
                         }
                     }
             }
@@ -60,6 +63,17 @@ struct TriggerListView: View {
         // Sheet for editing existing triggers
         .sheet(item: $triggerToEdit) { trigger in
             TriggerEditorSheet(viewModel: viewModel, existingTrigger: trigger)
+        }
+        .alert("Delete Trigger?", isPresented: $isShowingDeleteConfirmation, presenting: triggerToDelete) { trigger in
+            Button("Cancel", role: .cancel) {
+                triggerToDelete = nil
+            }
+            Button("Delete", role: .destructive) {
+                viewModel.deleteIndependentTrigger(trigger)
+                triggerToDelete = nil
+            }
+        } message: { trigger in
+            Text("Are you sure you want to delete \"\(trigger.name)\"? This will also delete all visit history. This cannot be undone.")
         }
         .overlay {
             if viewModel.independentTriggers.isEmpty {

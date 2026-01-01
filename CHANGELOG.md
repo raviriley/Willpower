@@ -187,24 +187,11 @@ TODOs are organized into two phases:
   - Browser Automation: Shows which browsers have granted permission
 
 #### Settings View
-- [ ] **Implement Settings view** - Currently placeholder:
-  - **Status Section** (read-only, no controls):
-    - Daemon status indicator ("Protected" / "Not Running")
-    - **Hide all daemon start/stop controls** - daemon is invisible
-    - Only show "Reinstall Daemon" as last resort troubleshooting option
-  - **Permissions Section**:
-    - Browser automation permissions (per-browser status)
-  - **Preferences Section**:
-    - Launch at login toggle (SMAppService.loginItem)
-    - Notification preferences (block start/end)
-  - **Data Section**:
-    - Export blocklists (JSON)
-    - Import blocklists
-    - Reset all data (with confirmation, blocked if any locked blocks active)
-  - **About Section**:
-    - App version
-    - Daemon version
-    - Links to support/feedback
+- [x] **Implement Settings view** - **IMPLEMENTED**:
+  - **Status Section**: Protection status indicator, daemon last active timestamp, reinstall button
+  - **Preferences Section**: Launch at login toggle (SMAppService.mainApp)
+  - **Data Section**: Export/Import blocklists (JSON), Reset all data (blocked if locked blocks active)
+  - **About Section**: App/daemon version, blocklist/trigger counts, GitHub link
 
 #### Visual Design
 - [ ] **App icon** - Replace default SwiftUI app icon
@@ -225,10 +212,11 @@ TODOs are organized into two phases:
   - Permission checks
 
 #### Interaction Polish
-- [ ] **Confirmation dialogs** - Add for destructive actions:
-  - Delete blocklist (especially if has triggers)
-  - Reset all data
+- [x] **Confirmation dialogs** - **IMPLEMENTED**:
+  - Delete blocklist (warns about attached schedules)
+  - Delete trigger (warns about visit history loss)
   - Deactivate unlocked block
+  - Reset all data (in Settings)
 
 - [ ] **Success feedback** - Visual confirmation when:
   - Blocklist created/updated
@@ -259,10 +247,12 @@ TODOs are organized into two phases:
   - Gaming (steam, discord, twitch)
   - User can customize after import
 
-- [ ] **Domain validation** - Validate domains on input:
-  - Strip protocols and paths automatically
-  - Warn on invalid domain format
-  - Suggest corrections (e.g., "www.youtube.com" → "youtube.com")
+- [x] **Domain validation** - **IMPLEMENTED**:
+  - Strips protocols (http/https) and paths automatically
+  - Strips www. prefix automatically
+  - Validates domain format (must contain dot, valid characters only)
+  - Shows inline error messages for invalid input
+  - Prevents duplicate domains
 
 - [ ] **Bulk domain add** - Paste multiple domains:
   - Support comma, newline, or space-separated
