@@ -43,6 +43,9 @@ struct WillpowerApp: App {
                         onComplete: {
                             hasCompletedOnboarding = true
                             showOnboarding = false
+                            // Navigate to blocklists and open create sheet
+                            viewModel.selectedCategory = .blocklists
+                            viewModel.isShowingNewBlocklistSheet = true
                         }
                     )
                     .interactiveDismissDisabled()
