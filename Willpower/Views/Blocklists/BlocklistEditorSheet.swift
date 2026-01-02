@@ -13,7 +13,7 @@ import WillpowerKit
 enum BlocklistPreset: String, CaseIterable, Identifiable {
     case socialMedia = "Social Media"
     case news = "News & Reddit"
-    case video = "Video Streaming"
+    case video = "Videos & Streaming"
     case gaming = "Gaming"
 
     var id: String { rawValue }
@@ -32,7 +32,7 @@ enum BlocklistPreset: String, CaseIterable, Identifiable {
         case .socialMedia:
             return [
                 "twitter.com", "x.com", "facebook.com", "instagram.com",
-                "tiktok.com", "snapchat.com", "linkedin.com", "threads.net"
+                "tiktok.com", "snapchat.com", "linkedin.com", "threads.com", "reddit.com"
             ]
         case .news:
             return [
@@ -42,11 +42,12 @@ enum BlocklistPreset: String, CaseIterable, Identifiable {
         case .video:
             return [
                 "youtube.com", "netflix.com", "hulu.com", "disneyplus.com",
-                "twitch.tv", "primevideo.com", "hbomax.com", "peacocktv.com"
+                "primevideo.com", "hbomax.com", "peacocktv.com",
+                "twitch.tv", "rumble.com", "kick.com", "parti.com"
             ]
         case .gaming:
             return [
-                "store.steampowered.com", "discord.com", "twitch.tv",
+                "steampowered.com", "discord.com", "twitch.tv",
                 "epicgames.com", "roblox.com", "ea.com", "battle.net"
             ]
         }
@@ -208,7 +209,7 @@ struct BlocklistEditorSheet: View {
                             .font(.caption)
                             .foregroundStyle(.orange)
                     } else {
-                        Text("Enter domain names without http:// or www. prefix. You can also paste URLs and they will be cleaned automatically.")
+                        Text("You can paste URLs and they will be cleaned automatically.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }

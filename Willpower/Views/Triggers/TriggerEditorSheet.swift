@@ -158,7 +158,7 @@ struct TriggerEditorSheet: View {
                             .font(.callout)
                             .foregroundStyle(.secondary)
 
-                        Text("Each pattern can independently block its domain or activate a blocklist.")
+                        Text("Each pattern independently blocks its domain or activate a blocklist.")
                             .font(.callout)
                             .foregroundStyle(.secondary)
                     }
@@ -240,7 +240,7 @@ struct TriggerEditorSheet: View {
             return "→ blocks \(pattern.associatedDomain)"
         case .activateBlocklist(let blocklistId):
             if let blocklist = viewModel.blocklists.first(where: { $0.id == blocklistId }) {
-                return "→ activates \(blocklist.name)"
+                return "→ activates \(blocklist.name) blocklist"
             }
             return "→ activates blocklist"
         }
