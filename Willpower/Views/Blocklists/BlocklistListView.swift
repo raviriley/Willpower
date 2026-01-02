@@ -41,13 +41,10 @@ struct BlocklistListView: View {
         .navigationTitle("Blocklists")
         .toolbar {
             ToolbarItem {
-                Button(action: { viewModel.isShowingNewBlocklistSheet = true }) {
+                Button(action: { createNewBlocklist() }) {
                     Label("New Blocklist", systemImage: "plus")
                 }
             }
-        }
-        .sheet(isPresented: $viewModel.isShowingNewBlocklistSheet) {
-            BlocklistEditorSheet(viewModel: viewModel, blocklist: nil)
         }
         .alert("Delete Blocklist?", isPresented: $isShowingDeleteConfirmation, presenting: blocklistToDelete) { blocklist in
             Button("Cancel", role: .cancel) {
@@ -73,12 +70,16 @@ struct BlocklistListView: View {
                     Text("Create a blocklist to group distracting websites together. Block them manually or automatically with schedules and triggers.")
                 } actions: {
                     Button("Create Blocklist") {
-                        viewModel.isShowingNewBlocklistSheet = true
+                        createNewBlocklist()
                     }
                     .buttonStyle(.borderedProminent)
                 }
             }
         }
+    }
+
+    private func createNewBlocklist() {
+        viewModel.createBlocklist(name: "New Blocklist", domains: [])
     }
 }
 

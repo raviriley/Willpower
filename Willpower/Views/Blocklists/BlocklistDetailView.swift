@@ -8,12 +8,80 @@
 import SwiftUI
 import WillpowerKit
 
+// MARK: - Blocklist Presets
+
+enum BlocklistPreset: String, CaseIterable, Identifiable {
+    case socialMedia = "Social Media"
+    case news = "News & Reddit"
+    case video = "Videos & Streaming"
+    case gaming = "Gaming"
+
+    var id: String { rawValue }
+
+    var icon: String {
+        switch self {
+        case .socialMedia: return "bubble.left.and.bubble.right"
+        case .news: return "newspaper"
+        case .video: return "play.rectangle"
+        case .gaming: return "gamecontroller"
+        }
+    }
+
+    var domains: [String] {
+        switch self {
+        case .socialMedia:
+            return [
+                "twitter.com", "x.com", "facebook.com", "instagram.com",
+                "tiktok.com", "snapchat.com", "linkedin.com", "threads.com", "reddit.com"
+            ]
+        case .news:
+            return [
+                "reddit.com", "news.ycombinator.com", "cnn.com", "nytimes.com",
+                "bbc.com", "foxnews.com", "theguardian.com", "washingtonpost.com"
+            ]
+        case .video:
+            return [
+                "youtube.com", "netflix.com", "hulu.com", "disneyplus.com",
+                "primevideo.com", "hbomax.com", "peacocktv.com",
+                "twitch.tv", "rumble.com", "kick.com", "parti.com"
+            ]
+        case .gaming:
+            return [
+                "steampowered.com", "discord.com", "twitch.tv",
+                "epicgames.com", "roblox.com", "ea.com", "battle.net"
+            ]
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .socialMedia:
+            return "Block social media platforms"
+        case .news:
+            return "Block news sites and Reddit"
+        case .video:
+            return "Block video streaming services"
+        case .gaming:
+            return "Block gaming platforms"
+        }
+    }
+}
+
+// MARK: - BlocklistDetailView
+
 struct BlocklistDetailView: View {
     @Bindable var viewModel: WillpowerViewModel
     let blocklistId: UUID
 
-    @State private var isShowingEditor = false
     @State private var isShowingDeactivateConfirmation = false
+    @State private var isShowingDeleteConfirmation = false
+
+    // Inline editing state
+    @State private var name: String = ""
+    @State private var domains: [String] = []
+    @State private var newDomain: String = ""
+    @State private var domainValidationError: String?
+    @State private var originalDomains: Set<String> = []
 
     /// Get the current blocklist from viewModel (always fresh)
     var blocklist: BlocklistConfig? {
@@ -23,6 +91,17 @@ struct BlocklistDetailView: View {
     var activeBlock: ActiveBlock? {
         guard let blocklist else { return nil }
         return viewModel.activeBlock(for: blocklist)
+    }
+
+    /// Check if this blocklist has an active (non-expired) block
+    var isBlocklistActive: Bool {
+        activeBlock != nil
+    }
+
+    /// Check if a domain can be deleted (only new domains when active)
+    func canDeleteDomain(_ domain: String) -> Bool {
+        if !isBlocklistActive { return true }
+        return !originalDomains.contains(domain)
     }
 
     /// Independent triggers that target this blocklist
@@ -42,8 +121,17 @@ struct BlocklistDetailView: View {
         Group {
             if let blocklist {
                 Form {
-                    // Status & Actions Section (combined)
-                    Section {
+                    // Name Section
+                    Section("Name") {
+                        TextField("Blocklist Name", text: $name)
+                            .textFieldStyle(.plain)
+                            .onChange(of: name) { _, newValue in
+                                saveIfValid()
+                            }
+                    }
+
+                    // Status & Actions Section
+                    Section("Status") {
                         if let activeBlock {
                             // Active state UI
                             HStack {
@@ -78,7 +166,7 @@ struct BlocklistDetailView: View {
                                 }
                             }
                             .padding(.vertical, 4)
-                            
+
                             if activeBlock.isLocked {
                                 Label {
                                     Text("This block cannot be deactivated until it expires")
@@ -106,7 +194,7 @@ struct BlocklistDetailView: View {
                                 Spacer()
                             }
                             .padding(.vertical, 4)
-                            
+
                             Button {
                                 viewModel.isShowingActivationSheet = true
                             } label: {
@@ -155,41 +243,132 @@ struct BlocklistDetailView: View {
                         }
                     } header: {
                         Text("Triggers")
-                            .padding(.leading, -8)
                     }
 
-                    // Domains Section
-                    Section {
-                        if blocklist.domains.isEmpty {
-                            HStack {
-                                Image(systemName: "globe.badge.chevron.backward")
-                                    .foregroundStyle(.secondary)
-                                Text("No domains configured")
-                                    .foregroundStyle(.secondary)
+                    // Active blocklist warning banner
+                    if isBlocklistActive {
+                        Section {
+                            HStack(spacing: 12) {
+                                Image(systemName: "lock.fill")
+                                    .foregroundStyle(.orange)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Blocklist is Active")
+                                        .font(.headline)
+                                    Text("You can add new domains but cannot remove existing ones until the block expires.")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
                             }
-                        } else {
-                            ForEach(blocklist.domains, id: \.self) { domain in
+                            .padding(.vertical, 4)
+                        }
+                    }
+
+                    // Preset templates (only show when no domains yet)
+                    if domains.isEmpty && !isBlocklistActive {
+                        Section("Start from Template") {
+                            ForEach(BlocklistPreset.allCases) { preset in
+                                Button {
+                                    applyPreset(preset)
+                                } label: {
+                                    HStack {
+                                        Image(systemName: preset.icon)
+                                            .foregroundStyle(.blue)
+                                            .frame(width: 24)
+                                        VStack(alignment: .leading) {
+                                            Text(preset.rawValue)
+                                                .foregroundStyle(.primary)
+                                            Text("\(preset.domains.count) sites")
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        Spacer()
+                                        Image(systemName: "plus.circle")
+                                            .foregroundStyle(.blue)
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+
+                    // Domains Section (editable)
+                    Section {
+                        ForEach(domains, id: \.self) { domain in
+                            HStack {
                                 Text(domain)
                                     .font(.system(.body, design: .monospaced))
+
+                                Spacer()
+
+                                if canDeleteDomain(domain) {
+                                    Button(role: .destructive) {
+                                        domains.removeAll { $0 == domain }
+                                        saveIfValid()
+                                    } label: {
+                                        Image(systemName: "minus.circle.fill")
+                                            .foregroundStyle(.red)
+                                    }
+                                    .buttonStyle(.plain)
+                                } else {
+                                    Image(systemName: "lock.fill")
+                                        .foregroundStyle(.secondary)
+                                        .help("Cannot remove while blocklist is active")
+                                }
+                            }
+                        }
+
+                        // Add new domain
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(spacing: 8) {
+                                TextField("Add domain", text: $newDomain)
+                                    .textFieldStyle(.roundedBorder)
+                                    .font(.system(.body, design: .default))
+                                    .lineLimit(1)
+                                    .truncationMode(.tail)
+                                    .onSubmit {
+                                        addDomain()
+                                    }
+                                    .onChange(of: newDomain) { _, _ in
+                                        domainValidationError = nil
+                                    }
+
+                                Button {
+                                    addDomain()
+                                } label: {
+                                    Image(systemName: "plus.circle.fill")
+                                }
+                                .buttonStyle(.plain)
+                                .foregroundStyle(newDomain.trimmingCharacters(in: .whitespaces).isEmpty ? Color.secondary : Color.blue)
+                                .disabled(newDomain.trimmingCharacters(in: .whitespaces).isEmpty)
+                            }
+
+                            if let error = domainValidationError {
+                                Text(error)
+                                    .font(.caption)
+                                    .foregroundStyle(.red)
                             }
                         }
                     } header: {
-                        Text("Blocked Domains (\(blocklist.domains.count))")
-                            .padding(.leading, -8)
+                        Text("Blocked Domains (\(domains.count))")
+                    } footer: {
+                        if isBlocklistActive {
+                            Text("New domains will be blocked immediately.")
+                                .foregroundStyle(.orange)
+                        } else {
+                            Text("You can paste URLs and they will be cleaned automatically.")
+                        }
+                    }
+
+                    // Delete Section
+                    Section {
+                        Button("Delete Blocklist", role: .destructive) {
+                            isShowingDeleteConfirmation = true
+                        }
+                        .disabled(isBlocklistActive && activeBlock?.isLocked == true)
                     }
                 }
                 .formStyle(.grouped)
-                .navigationTitle(blocklist.name)
-                .toolbar {
-                    ToolbarItem {
-                        Button("Edit") {
-                            isShowingEditor = true
-                        }
-                    }
-                }
-                .sheet(isPresented: $isShowingEditor) {
-                    BlocklistEditorSheet(viewModel: viewModel, blocklist: blocklist)
-                }
+                .navigationTitle("Blocklist")
                 .sheet(isPresented: $viewModel.isShowingActivationSheet) {
                     ManualActivationSheet(viewModel: viewModel, blocklistId: blocklistId)
                 }
@@ -201,14 +380,134 @@ struct BlocklistDetailView: View {
                 } message: {
                     Text("This will immediately unblock all domains in \"\(blocklist.name)\". Are you sure?")
                 }
+                .alert("Delete Blocklist?", isPresented: $isShowingDeleteConfirmation) {
+                    Button("Cancel", role: .cancel) { }
+                    Button("Delete", role: .destructive) {
+                        viewModel.deleteBlocklist(blocklist)
+                    }
+                } message: {
+                    Text("Are you sure you want to delete \"\(blocklist.name)\"? This cannot be undone.")
+                }
             } else {
                 ContentUnavailableView(
-                    "Blocklist Not Found",
-                    systemImage: "exclamationmark.triangle",
-                    description: Text("This blocklist may have been deleted")
+                    "Select a Blocklist",
+                    systemImage: "list.bullet.rectangle",
+                    description: Text("Choose a blocklist from the list to view details")
                 )
             }
         }
+        .onChange(of: blocklistId) { _, _ in
+            loadBlocklistData()
+        }
+        .onAppear {
+            loadBlocklistData()
+        }
+    }
+
+    private func loadBlocklistData() {
+        if let blocklist {
+            name = blocklist.name
+            domains = blocklist.domains
+            originalDomains = Set(blocklist.domains)
+            newDomain = ""
+            domainValidationError = nil
+        }
+    }
+
+    private func addDomain() {
+        let cleaned = cleanDomain(newDomain)
+
+        if cleaned.isEmpty {
+            domainValidationError = "Please enter a domain"
+            return
+        }
+
+        if domains.contains(cleaned) {
+            domainValidationError = "This domain is already in the list"
+            newDomain = ""
+            return
+        }
+
+        if let validationError = validateDomainFormat(cleaned) {
+            domainValidationError = validationError
+            return
+        }
+
+        domains.append(cleaned)
+        newDomain = ""
+        domainValidationError = nil
+        saveIfValid()
+    }
+
+    private func saveIfValid() {
+        guard var updated = blocklist else { return }
+        let trimmedName = name.trimmingCharacters(in: .whitespaces)
+
+        // Only save if name is valid and domains exist
+        guard !trimmedName.isEmpty, !domains.isEmpty else { return }
+
+        updated.name = trimmedName
+        updated.domains = domains
+        viewModel.updateBlocklist(updated)
+    }
+
+    private func applyPreset(_ preset: BlocklistPreset) {
+        // Set name from preset if still default
+        if name == "New Blocklist" || name.isEmpty {
+            name = preset.rawValue
+        }
+        // Add all preset domains (avoiding duplicates)
+        for domain in preset.domains {
+            if !domains.contains(domain) {
+                domains.append(domain)
+            }
+        }
+        saveIfValid()
+    }
+
+    private func cleanDomain(_ input: String) -> String {
+        var cleaned = input.lowercased().trimmingCharacters(in: .whitespaces)
+        if cleaned.hasPrefix("http://") { cleaned = String(cleaned.dropFirst(7)) }
+        if cleaned.hasPrefix("https://") { cleaned = String(cleaned.dropFirst(8)) }
+        if cleaned.hasPrefix("www.") { cleaned = String(cleaned.dropFirst(4)) }
+        if let slash = cleaned.firstIndex(of: "/") { cleaned = String(cleaned[..<slash]) }
+        return cleaned
+    }
+
+    private func validateDomainFormat(_ domain: String) -> String? {
+        if domain.contains(" ") {
+            return "Domain cannot contain spaces"
+        }
+
+        if !domain.contains(".") {
+            return "Invalid domain format. Example: youtube.com"
+        }
+
+        let validCharacters = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-."))
+        if domain.unicodeScalars.contains(where: { !validCharacters.contains($0) }) {
+            return "Domain contains invalid characters"
+        }
+
+        if domain.contains("..") {
+            return "Domain cannot contain consecutive dots"
+        }
+
+        if domain.hasPrefix(".") || domain.hasSuffix(".") {
+            return "Domain cannot start or end with a dot"
+        }
+
+        if domain.hasPrefix("-") || domain.hasSuffix("-") {
+            return "Domain cannot start or end with a hyphen"
+        }
+
+        if let lastDot = domain.lastIndex(of: ".") {
+            let tld = String(domain[domain.index(after: lastDot)...])
+            if tld.count < 2 {
+                return "Invalid top-level domain"
+            }
+        }
+
+        return nil
     }
 }
 
@@ -408,10 +707,8 @@ struct IndependentTriggerSummaryRow: View {
     viewModel.blocklists.append(blocklist)
     viewModel.selectedBlocklistId = blocklist.id
 
-    return NavigationStack {
-        BlocklistDetailView(
-            viewModel: viewModel,
-            blocklistId: blocklist.id
-        )
-    }
+    return BlocklistDetailView(
+        viewModel: viewModel,
+        blocklistId: blocklist.id
+    )
 }
