@@ -112,13 +112,11 @@ struct ScheduleRowView: View {
     let blocklist: BlocklistConfig
     let viewModel: WillpowerViewModel
 
-    /// Check if this schedule is currently active
+    /// Check if this specific schedule's time window is currently active
     var isActive: Bool {
-        viewModel.activeBlocks.contains {
-            $0.blocklistId == blocklist.id &&
-            $0.reason == .scheduleBasedTrigger &&
-            !$0.isExpired
-        }
+        let evaluator = TriggerEvaluator()
+        let result = evaluator.evaluateTrigger(trigger, visitRecords: [])
+        return result.isActive
     }
 
     var body: some View {

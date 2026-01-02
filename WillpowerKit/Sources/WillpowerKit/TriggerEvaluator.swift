@@ -131,38 +131,45 @@ public struct TriggerEvaluator: Sendable {
         let minute = calendar.component(.minute, from: now)
         let currentMinutes = hour * 60 + minute
 
-        for window in config.windows {
-            // Check if today is in the schedule
-            guard window.weekdays.contains(weekday) else { continue }
+        // Yesterday's weekday (Sunday=1 wraps to Saturday=7)
+        let yesterday = weekday == 1 ? 7 : weekday - 1
 
+        for window in config.windows {
             let windowStart = window.startHour * 60 + window.startMinute
             let windowEnd = window.endHour * 60 + window.endMinute
+            let isOvernightWindow = windowStart > windowEnd
 
-            // Handle overnight windows (e.g., 22:00 - 06:00)
-            if windowStart <= windowEnd {
-                // Normal window (e.g., 09:00 - 17:00)
-                if currentMinutes >= windowStart && currentMinutes < windowEnd {
-                    let expiresAt = calculateEndTime(
-                        hour: window.endHour,
-                        minute: window.endMinute,
-                        from: now
-                    )
-                    return .active(expiresAt: expiresAt)
-                }
-            } else {
+            if isOvernightWindow {
                 // Overnight window (e.g., 22:00 - 06:00)
-                if currentMinutes >= windowStart || currentMinutes < windowEnd {
+                // Check both evening portion (today) and morning portion (yesterday's overnight)
+                let inEveningPortion = window.weekdays.contains(weekday) && currentMinutes >= windowStart
+                let inMorningPortion = window.weekdays.contains(yesterday) && currentMinutes < windowEnd
+
+                if inEveningPortion || inMorningPortion {
                     var expiresAt = calculateEndTime(
                         hour: window.endHour,
                         minute: window.endMinute,
                         from: now
                     )
 
-                    // If we're after the start time (e.g., 23:00), end time is tomorrow
-                    if currentMinutes >= windowStart {
+                    // If we're in the evening portion (after start), end time is tomorrow
+                    if inEveningPortion {
                         expiresAt = calendar.date(byAdding: .day, value: 1, to: expiresAt) ?? expiresAt
                     }
+                    // If we're in morning portion, end time is today (already correct)
 
+                    return .active(expiresAt: expiresAt)
+                }
+            } else {
+                // Normal window (e.g., 09:00 - 17:00)
+                guard window.weekdays.contains(weekday) else { continue }
+
+                if currentMinutes >= windowStart && currentMinutes < windowEnd {
+                    let expiresAt = calculateEndTime(
+                        hour: window.endHour,
+                        minute: window.endMinute,
+                        from: now
+                    )
                     return .active(expiresAt: expiresAt)
                 }
             }
