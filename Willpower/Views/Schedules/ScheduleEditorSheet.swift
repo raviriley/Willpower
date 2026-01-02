@@ -16,22 +16,35 @@ struct ScheduleEditorSheet: View {
 
     @Environment(\.dismiss) private var dismiss
 
-    @State private var windows: [ScheduleBasedTrigger.ScheduleWindow] = []
-    @State private var isAddingWindow = false
-    /// Original windows when editing (to track what's protected if active)
-    @State private var originalWindows: [ScheduleBasedTrigger.ScheduleWindow] = []
+    // Time window configuration (inline, single window per schedule)
+    @State private var startHour: Int = 9
+    @State private var startMinute: Int = 0
+    @State private var endHour: Int = 17
+    @State private var endMinute: Int = 0
+    @State private var selectedWeekdays: Set<Int> = ScheduleBasedTrigger.ScheduleWindow.weekdaysOnly
 
     var isEditing: Bool { existingTrigger != nil }
 
     /// Check if this schedule has an active block right now
     var isScheduleActive: Bool {
-        guard existingTrigger != nil else { return false }
-        // Check if there's an active block for this blocklist with schedule reason
-        return viewModel.activeBlocks.contains {
-            $0.blocklistId == blocklist.id &&
-            $0.reason == .scheduleBasedTrigger &&
-            !$0.isExpired
-        }
+        guard let trigger = existingTrigger else { return false }
+        let evaluator = TriggerEvaluator()
+        let result = evaluator.evaluateTrigger(trigger, visitRecords: [])
+        return result.isActive
+    }
+
+    /// Formatted time range for display
+    var timeRangeDescription: String {
+        let start = String(format: "%02d:%02d", startHour, startMinute)
+        let end = String(format: "%02d:%02d", endHour, endMinute)
+        return "\(start) - \(end)"
+    }
+
+    /// Check if this is an overnight schedule
+    var isOvernightSchedule: Bool {
+        let startMinutes = startHour * 60 + startMinute
+        let endMinutes = endHour * 60 + endMinute
+        return startMinutes > endMinutes
     }
 
     init(viewModel: WillpowerViewModel, blocklist: BlocklistConfig, existingTrigger: TriggerConfig? = nil) {
@@ -66,36 +79,79 @@ struct ScheduleEditorSheet: View {
                     }
                 }
 
-                Section("Schedule Windows") {
-                    ForEach(windows) { window in
-                        HStack {
-                            VStack(alignment: .leading) {
-                                Text(window.timeRangeDescription)
-                                    .font(.headline)
-                                Text(window.weekdaysDescription)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
+                // Time Range Section
+                Section("Time Range") {
+                    HStack(spacing: 20) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Start")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            HStack(spacing: 4) {
+                                Picker("Hour", selection: $startHour) {
+                                    ForEach(0..<24, id: \.self) {
+                                        Text(String(format: "%02d", $0)).tag($0)
+                                    }
+                                }
+                                .labelsHidden()
+                                .frame(width: 60)
 
-                            Spacer()
+                                Text(":")
 
-                            Button(role: .destructive) {
-                                windows.removeAll { $0.id == window.id }
-                            } label: {
-                                Image(systemName: "minus.circle.fill")
-                                    .foregroundStyle(.red)
+                                Picker("Minute", selection: $startMinute) {
+                                    ForEach([0, 15, 30, 45], id: \.self) {
+                                        Text(String(format: "%02d", $0)).tag($0)
+                                    }
+                                }
+                                .labelsHidden()
+                                .frame(width: 60)
                             }
-                            .buttonStyle(.plain)
+                        }
+
+                        Image(systemName: "arrow.right")
+                            .foregroundStyle(.secondary)
+
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("End")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            HStack(spacing: 4) {
+                                Picker("Hour", selection: $endHour) {
+                                    ForEach(0..<24, id: \.self) {
+                                        Text(String(format: "%02d", $0)).tag($0)
+                                    }
+                                }
+                                .labelsHidden()
+                                .frame(width: 60)
+
+                                Text(":")
+
+                                Picker("Minute", selection: $endMinute) {
+                                    ForEach([0, 15, 30, 45], id: \.self) {
+                                        Text(String(format: "%02d", $0)).tag($0)
+                                    }
+                                }
+                                .labelsHidden()
+                                .frame(width: 60)
+                            }
                         }
                     }
+                    .padding(.vertical, 4)
 
-                    Button("Add Time Window") {
-                        isAddingWindow = true
+                    if isOvernightSchedule {
+                        Label("Overnight schedule (ends next day)", systemImage: "moon.stars")
+                            .font(.caption)
+                            .foregroundStyle(.blue)
                     }
                 }
 
+                // Days Section
+                Section("Days") {
+                    WeekdayPicker(selectedDays: $selectedWeekdays)
+                        .padding(.vertical, 4)
+                }
+
                 Section {
-                    Text("The blocklist will automatically activate during these time windows.")
+                    Text("The blocklist will automatically activate during this time window on the selected days.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -112,26 +168,33 @@ struct ScheduleEditorSheet: View {
                     Button(isEditing ? "Save" : "Create") {
                         save()
                     }
-                    .disabled(windows.isEmpty)
+                    .disabled(selectedWeekdays.isEmpty)
                 }
             }
         }
-        .frame(minWidth: 450, minHeight: 400)
-        .sheet(isPresented: $isAddingWindow) {
-            TimeWindowEditorSheet { window in
-                windows.append(window)
-            }
-        }
+        .frame(minWidth: 400, minHeight: 350)
         .onAppear {
-            if let trigger = existingTrigger, let schedule = trigger.scheduleBased {
-                windows = schedule.windows
-                originalWindows = schedule.windows
+            if let trigger = existingTrigger,
+               let schedule = trigger.scheduleBased,
+               let window = schedule.windows.first {
+                startHour = window.startHour
+                startMinute = window.startMinute
+                endHour = window.endHour
+                endMinute = window.endMinute
+                selectedWeekdays = window.weekdays
             }
         }
     }
 
     private func save() {
-        let schedule = ScheduleBasedTrigger(windows: windows)
+        let window = ScheduleBasedTrigger.ScheduleWindow(
+            startHour: startHour,
+            startMinute: startMinute,
+            endHour: endHour,
+            endMinute: endMinute,
+            weekdays: selectedWeekdays
+        )
+        let schedule = ScheduleBasedTrigger(windows: [window])
 
         if let existingTrigger {
             // Update existing schedule
@@ -141,113 +204,6 @@ struct ScheduleEditorSheet: View {
             viewModel.addSchedule(to: blocklist, schedule: schedule)
         }
         dismiss()
-    }
-}
-
-// MARK: - Time Window Editor Sheet
-
-struct TimeWindowEditorSheet: View {
-    @Environment(\.dismiss) private var dismiss
-
-    @State private var startHour: Int = 9
-    @State private var startMinute: Int = 0
-    @State private var endHour: Int = 17
-    @State private var endMinute: Int = 0
-    @State private var selectedWeekdays: Set<Int> = ScheduleBasedTrigger.ScheduleWindow.weekdaysOnly
-
-    var onSave: (ScheduleBasedTrigger.ScheduleWindow) -> Void
-
-    var body: some View {
-        VStack(spacing: 24) {
-            Text("Add Schedule Window")
-                .font(.title2)
-                .fontWeight(.semibold)
-
-            // Time Pickers
-            HStack(spacing: 40) {
-                VStack(spacing: 8) {
-                    Text("Start Time")
-                        .font(.headline)
-                    HStack(spacing: 4) {
-                        Picker("Hour", selection: $startHour) {
-                            ForEach(0..<24, id: \.self) {
-                                Text(String(format: "%02d", $0)).tag($0)
-                            }
-                        }
-                        .labelsHidden()
-                        .frame(width: 60)
-
-                        Text(":")
-
-                        Picker("Minute", selection: $startMinute) {
-                            ForEach([0, 15, 30, 45], id: \.self) {
-                                Text(String(format: "%02d", $0)).tag($0)
-                            }
-                        }
-                        .labelsHidden()
-                        .frame(width: 60)
-                    }
-                }
-
-                Image(systemName: "arrow.right")
-                    .foregroundStyle(.secondary)
-
-                VStack(spacing: 8) {
-                    Text("End Time")
-                        .font(.headline)
-                    HStack(spacing: 4) {
-                        Picker("Hour", selection: $endHour) {
-                            ForEach(0..<24, id: \.self) {
-                                Text(String(format: "%02d", $0)).tag($0)
-                            }
-                        }
-                        .labelsHidden()
-                        .frame(width: 60)
-
-                        Text(":")
-
-                        Picker("Minute", selection: $endMinute) {
-                            ForEach([0, 15, 30, 45], id: \.self) {
-                                Text(String(format: "%02d", $0)).tag($0)
-                            }
-                        }
-                        .labelsHidden()
-                        .frame(width: 60)
-                    }
-                }
-            }
-
-            // Weekday Picker
-            WeekdayPicker(selectedDays: $selectedWeekdays)
-
-            Spacer()
-
-            // Actions
-            HStack(spacing: 16) {
-                Button("Cancel") {
-                    dismiss()
-                }
-                .keyboardShortcut(.escape)
-                .buttonStyle(.bordered)
-
-                Button("Add") {
-                    let window = ScheduleBasedTrigger.ScheduleWindow(
-                        startHour: startHour,
-                        startMinute: startMinute,
-                        endHour: endHour,
-                        endMinute: endMinute,
-                        weekdays: selectedWeekdays
-                    )
-                    onSave(window)
-                    dismiss()
-                }
-                .keyboardShortcut(.return)
-                .buttonStyle(.borderedProminent)
-                .disabled(selectedWeekdays.isEmpty)
-            }
-        }
-        .padding(24)
-        .frame(width: 400, height: 380)
     }
 }
 
