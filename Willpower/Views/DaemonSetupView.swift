@@ -20,12 +20,12 @@ struct DaemonSetupView: View {
                 .foregroundStyle(.blue)
 
             // Title
-            Text("Install Helper Tool")
+            Text("Install Background Helper")
                 .font(.title)
                 .fontWeight(.semibold)
 
             // Description
-            Text("Willpower needs a privileged helper tool to block websites by modifying the system hosts file. This runs in the background with administrator privileges.")
+            Text("Willpower needs to run in the background to block websites.")
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal)
@@ -56,16 +56,42 @@ struct DaemonSetupView: View {
 
             // Help text
             if daemonManager.needsApproval {
-                VStack(spacing: 8) {
+                VStack(alignment: .leading, spacing: 12) {
                     Text("After clicking 'Open System Settings':")
                         .font(.callout)
                         .fontWeight(.medium)
-                    Text("1. Go to General > Login Items\n2. Find 'Willpower' under 'Allow in the Background'\n3. Toggle it ON")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(alignment: .top, spacing: 8) {
+                            Text("1.")
+                                .fontWeight(.semibold)
+                                .frame(width: 20, alignment: .trailing)
+                            Text("Go to **General** > **Login Items**")
+                        }
+                        HStack(alignment: .top, spacing: 8) {
+                            Text("2.")
+                                .fontWeight(.semibold)
+                                .frame(width: 20, alignment: .trailing)
+                            Text("Find **Willpower** under 'Allow in the Background'")
+                        }
+                        HStack(alignment: .top, spacing: 8) {
+                            Text("3.")
+                                .fontWeight(.semibold)
+                                .frame(width: 20, alignment: .trailing)
+                            Text("Toggle it **ON**")
+                        }
+                        HStack(alignment: .top, spacing: 8) {
+                            Text("4.")
+                                .fontWeight(.semibold)
+                                .frame(width: 20, alignment: .trailing)
+                            Text("Click **Refresh Status**")
+                        }
+                    }
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
                 }
                 .padding()
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
             }
         }
@@ -92,13 +118,8 @@ struct DaemonSetupView: View {
     @ViewBuilder
     private var actionButtons: some View {
         HStack(spacing: 16) {
-            Button("Later") {
-                dismiss()
-            }
-            .buttonStyle(.bordered)
-
             if daemonManager.needsInstallation {
-                Button("Install Helper") {
+                Button("Install Background Helper") {
                     daemonManager.register()
                 }
                 .buttonStyle(.borderedProminent)
