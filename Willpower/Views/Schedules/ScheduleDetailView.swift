@@ -69,11 +69,9 @@ struct ScheduleDetailView: View {
 
                     // Time Range Section
                     Section("Time Range") {
-                        HStack(spacing: 20) {
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text("Start")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+                        Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 0) {
+                            GridRow {
+                                // Start time
                                 HStack(spacing: 4) {
                                     Picker("Hour", selection: $startHour) {
                                         ForEach(0..<24, id: \.self) {
@@ -84,6 +82,7 @@ struct ScheduleDetailView: View {
                                     .frame(width: 60)
 
                                     Text(":")
+                                        .foregroundStyle(.secondary)
 
                                     Picker("Minute", selection: $startMinute) {
                                         ForEach([0, 15, 30, 45], id: \.self) {
@@ -93,15 +92,13 @@ struct ScheduleDetailView: View {
                                     .labelsHidden()
                                     .frame(width: 60)
                                 }
-                            }
 
-                            Image(systemName: "arrow.right")
-                                .foregroundStyle(.secondary)
+                                // Arrow
+                                Image(systemName: "arrow.right")
+                                    .foregroundStyle(.tertiary)
+                                    .font(.title3)
 
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text("End")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+                                // End time
                                 HStack(spacing: 4) {
                                     Picker("Hour", selection: $endHour) {
                                         ForEach(0..<24, id: \.self) {
@@ -112,6 +109,7 @@ struct ScheduleDetailView: View {
                                     .frame(width: 60)
 
                                     Text(":")
+                                        .foregroundStyle(.secondary)
 
                                     Picker("Minute", selection: $endMinute) {
                                         ForEach([0, 15, 30, 45], id: \.self) {
@@ -123,7 +121,6 @@ struct ScheduleDetailView: View {
                                 }
                             }
                         }
-                        .padding(.vertical, 4)
 
                         if isOvernightSchedule {
                             Label("Overnight schedule (ends next day)", systemImage: "moon.stars")
@@ -135,10 +132,7 @@ struct ScheduleDetailView: View {
                     // Days Section
                     Section("Days") {
                         WeekdayPicker(selectedDays: $selectedWeekdays)
-                            .padding(.vertical, 4)
-                    }
 
-                    Section {
                         Text("The blocklist will automatically activate during this time window on the selected days.")
                             .font(.caption)
                             .foregroundStyle(.secondary)

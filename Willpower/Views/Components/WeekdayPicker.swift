@@ -21,9 +21,6 @@ struct WeekdayPicker: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            Text("Days")
-                .font(.headline)
-
             HStack(spacing: 8) {
                 ForEach(days, id: \.0) { day, label in
                     Button {
