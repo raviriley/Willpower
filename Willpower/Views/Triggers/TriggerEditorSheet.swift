@@ -24,6 +24,7 @@ struct TriggerEditorSheet: View {
     @State private var newPatternIsRegex: Bool = false
     @State private var newPatternBlockAction: BlockAction = .blockDomain
     @State private var newPatternBlocklistId: UUID?
+    @State private var patternValidationError: String?
 
     var isEditing: Bool { existingTrigger != nil }
 
@@ -106,6 +107,16 @@ struct TriggerEditorSheet: View {
                         TextField("URL pattern (e.g., youtube.com/shorts)", text: $newPattern)
                             .textFieldStyle(.plain)
                             .onSubmit { addPattern() }
+                            .onChange(of: newPattern) { _, _ in
+                                // Clear error when user starts typing
+                                patternValidationError = nil
+                            }
+
+                        if let error = patternValidationError {
+                            Text(error)
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                        }
 
                         HStack {
                             Toggle("Use Regex", isOn: $newPatternIsRegex)
@@ -192,12 +203,30 @@ struct TriggerEditorSheet: View {
     }
 
     private func addPattern() {
-        let trimmed = newPattern.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty else { return }
+        let cleaned = cleanURLPattern(newPattern)
 
-        let domain = extractDomain(from: trimmed)
+        // Validate the cleaned pattern
+        if cleaned.isEmpty {
+            patternValidationError = "Please enter a URL pattern"
+            return
+        }
+
+        // Check for duplicates
+        if urlPatterns.contains(where: { $0.pattern == cleaned }) {
+            patternValidationError = "This pattern is already in the list"
+            newPattern = ""
+            return
+        }
+
+        // Validate pattern format (skip validation for regex patterns)
+        if !newPatternIsRegex, let validationError = validateURLPattern(cleaned) {
+            patternValidationError = validationError
+            return
+        }
+
+        let domain = extractDomain(from: cleaned)
         let pattern = URLPattern(
-            pattern: trimmed,
+            pattern: cleaned,
             isRegex: newPatternIsRegex,
             associatedDomain: domain,
             blockAction: newPatternBlockAction
@@ -207,6 +236,7 @@ struct TriggerEditorSheet: View {
         newPattern = ""
         newPatternIsRegex = false
         newPatternBlockAction = .blockDomain
+        patternValidationError = nil
     }
 
     private func saveTrigger() {
@@ -253,6 +283,66 @@ struct TriggerEditorSheet: View {
         if domain.hasPrefix("www.") { domain = String(domain.dropFirst(4)) }
         if let slash = domain.firstIndex(of: "/") { domain = String(domain[..<slash]) }
         return domain
+    }
+
+    /// Cleans a URL pattern by removing protocol and www. prefix, but keeps the path
+    private func cleanURLPattern(_ input: String) -> String {
+        var cleaned = input.lowercased().trimmingCharacters(in: .whitespaces)
+        if cleaned.hasPrefix("http://") { cleaned = String(cleaned.dropFirst(7)) }
+        if cleaned.hasPrefix("https://") { cleaned = String(cleaned.dropFirst(8)) }
+        if cleaned.hasPrefix("www.") { cleaned = String(cleaned.dropFirst(4)) }
+        // Unlike domain cleaning, we keep the path for URL patterns
+        return cleaned
+    }
+
+    /// Validates URL pattern format (for non-regex patterns)
+    private func validateURLPattern(_ pattern: String) -> String? {
+        // Check for spaces
+        if pattern.contains(" ") {
+            return "URL pattern cannot contain spaces"
+        }
+
+        // Extract the domain part (before any path)
+        let domainPart: String
+        if let slash = pattern.firstIndex(of: "/") {
+            domainPart = String(pattern[..<slash])
+        } else {
+            domainPart = pattern
+        }
+
+        // Check for basic domain format (at least one dot in domain part)
+        if !domainPart.contains(".") {
+            return "Invalid URL pattern. Example: youtube.com/shorts"
+        }
+
+        // Check for valid characters in domain part (alphanumeric, hyphens, dots)
+        let validDomainCharacters = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-."))
+        if domainPart.unicodeScalars.contains(where: { !validDomainCharacters.contains($0) }) {
+            return "Domain contains invalid characters"
+        }
+
+        // Check for consecutive dots or starting/ending with dot/hyphen in domain
+        if domainPart.contains("..") {
+            return "Domain cannot contain consecutive dots"
+        }
+
+        if domainPart.hasPrefix(".") || domainPart.hasSuffix(".") {
+            return "Domain cannot start or end with a dot"
+        }
+
+        if domainPart.hasPrefix("-") || domainPart.hasSuffix("-") {
+            return "Domain cannot start or end with a hyphen"
+        }
+
+        // Check TLD exists (at least 2 characters after last dot in domain)
+        if let lastDot = domainPart.lastIndex(of: ".") {
+            let tld = String(domainPart[domainPart.index(after: lastDot)...])
+            if tld.count < 2 {
+                return "Invalid top-level domain"
+            }
+        }
+
+        return nil
     }
 
     private func formatDuration(_ seconds: Int) -> String {
