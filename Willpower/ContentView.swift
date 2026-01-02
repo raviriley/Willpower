@@ -92,38 +92,15 @@ struct DetailView: View {
                     )
                 }
             case .schedules:
-                ScheduleDetailPlaceholder()
+                ScheduleDetailView(viewModel: viewModel)
             case .triggers:
-                TriggerDetailPlaceholder()
+                TriggerDetailView(viewModel: viewModel)
             case .settings:
                 EmptyView()
             }
         }
     }
 }
-
-// MARK: - Placeholder Views (temporary)
-
-struct ScheduleDetailPlaceholder: View {
-    var body: some View {
-        ContentUnavailableView(
-            "Select a Schedule",
-            systemImage: "calendar.badge.clock",
-            description: Text("Choose a schedule to view or edit")
-        )
-    }
-}
-
-struct TriggerDetailPlaceholder: View {
-    var body: some View {
-        ContentUnavailableView(
-            "Select a Trigger",
-            systemImage: "eye.trianglebadge.exclamationmark",
-            description: Text("Choose a trigger to view or edit")
-        )
-    }
-}
-
 
 struct ActiveBlocksDetailView: View {
     var viewModel: WillpowerViewModel

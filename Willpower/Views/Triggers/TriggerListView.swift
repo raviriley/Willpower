@@ -11,24 +11,16 @@ import WillpowerKit
 struct TriggerListView: View {
     @Bindable var viewModel: WillpowerViewModel
 
-    @State private var isShowingNewTrigger = false
-    @State private var triggerToEdit: IndependentTrigger?
     @State private var triggerToDelete: IndependentTrigger?
     @State private var isShowingDeleteConfirmation = false
 
     var body: some View {
         let _ = handlePendingNavigation()
-        List {
+        List(selection: $viewModel.selectedTriggerId) {
             ForEach(viewModel.independentTriggers) { trigger in
                 TriggerRowView(trigger: trigger, viewModel: viewModel)
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        triggerToEdit = trigger
-                    }
+                    .tag(trigger.id)
                     .contextMenu {
-                        Button("Edit") {
-                            triggerToEdit = trigger
-                        }
                         Button("Reset Visit Count") {
                             let patternIds = trigger.urlPatterns.map { $0.id }
                             viewModel.resetVisitCounts(patternIds: patternIds)
@@ -51,19 +43,11 @@ struct TriggerListView: View {
         .toolbar {
             ToolbarItem {
                 Button {
-                    isShowingNewTrigger = true
+                    createNewTrigger()
                 } label: {
                     Label("Add Trigger", systemImage: "plus")
                 }
             }
-        }
-        // Sheet for creating new triggers
-        .sheet(isPresented: $isShowingNewTrigger) {
-            TriggerEditorSheet(viewModel: viewModel)
-        }
-        // Sheet for editing existing triggers
-        .sheet(item: $triggerToEdit) { trigger in
-            TriggerEditorSheet(viewModel: viewModel, existingTrigger: trigger)
         }
         .alert("Delete Trigger?", isPresented: $isShowingDeleteConfirmation, presenting: triggerToDelete) { trigger in
             Button("Cancel", role: .cancel) {
@@ -84,23 +68,39 @@ struct TriggerListView: View {
                     Text("Triggers monitor your browsing and automatically block websites after too many visits. Great for limiting time on addictive sites without blocking them entirely.")
                 } actions: {
                     Button("Add Trigger") {
-                        isShowingNewTrigger = true
+                        createNewTrigger()
                     }
                     .buttonStyle(.borderedProminent)
                 }
             }
         }
     }
-    
+
     /// Handle pending navigation from other views (e.g., BlocklistDetailView)
     private func handlePendingNavigation() {
         if let pending = viewModel.pendingTriggerToEdit {
             // Use async to defer state mutation to after view render
             Task { @MainActor in
-                triggerToEdit = pending
+                viewModel.selectedTriggerId = pending.id
                 viewModel.pendingTriggerToEdit = nil
             }
         }
+    }
+
+    private func createNewTrigger() {
+        // Create a default trigger with a placeholder pattern
+        let defaultPattern = URLPattern(
+            pattern: "example.com",
+            associatedDomain: "example.com"
+        )
+        let newTrigger = IndependentTrigger(
+            name: "New Trigger",
+            urlPatterns: [defaultPattern],
+            maxVisits: 5,
+            blockDurationSeconds: 3600
+        )
+        viewModel.createIndependentTrigger(newTrigger)
+        viewModel.selectedTriggerId = newTrigger.id
     }
 }
 
@@ -187,10 +187,6 @@ struct TriggerRowView: View {
             }
 
             Spacer()
-
-            Image(systemName: "chevron.right")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
         }
         .padding(.vertical, 4)
     }

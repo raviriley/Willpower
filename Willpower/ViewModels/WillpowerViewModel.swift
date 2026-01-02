@@ -70,7 +70,6 @@ final class WillpowerViewModel {
 
     var selectedCategory: SidebarCategory = .status
     var selectedBlocklistId: UUID?
-    var isShowingNewBlocklistSheet: Bool = false
     var isShowingActivationSheet: Bool = false
     var errorMessage: String?
     var isLoading: Bool = false
@@ -80,6 +79,12 @@ final class WillpowerViewModel {
     var pendingScheduleToEdit: (blocklist: BlocklistConfig, trigger: TriggerConfig)?
     /// Pending independent trigger to edit (set before navigating to triggers)
     var pendingTriggerToEdit: IndependentTrigger?
+
+    // Detail pane selection
+    /// Currently selected schedule (blocklist ID + trigger ID)
+    var selectedScheduleId: (blocklistId: UUID, triggerId: UUID)?
+    /// Currently selected independent trigger
+    var selectedTriggerId: UUID?
 
     // MARK: - Private
 
@@ -393,12 +398,15 @@ final class WillpowerViewModel {
     // MARK: - Schedule Management
 
     /// Add a schedule trigger to a blocklist
-    func addSchedule(to blocklist: BlocklistConfig, schedule: ScheduleBasedTrigger) {
-        guard var updated = blocklists.first(where: { $0.id == blocklist.id }) else { return }
-
+    @discardableResult
+    func addSchedule(to blocklist: BlocklistConfig, schedule: ScheduleBasedTrigger) -> UUID {
         let trigger = TriggerConfig.scheduleBased(schedule)
+
+        guard var updated = blocklists.first(where: { $0.id == blocklist.id }) else { return trigger.id }
+
         updated.triggers.append(trigger)
         updateBlocklist(updated)
+        return trigger.id
     }
 
     /// Remove a schedule trigger from a blocklist
@@ -523,6 +531,22 @@ final class WillpowerViewModel {
     var selectedBlocklist: BlocklistConfig? {
         guard let id = selectedBlocklistId else { return nil }
         return blocklists.first { $0.id == id }
+    }
+
+    /// Get currently selected schedule (blocklist + trigger)
+    var selectedSchedule: (blocklist: BlocklistConfig, trigger: TriggerConfig)? {
+        guard let ids = selectedScheduleId,
+              let blocklist = blocklists.first(where: { $0.id == ids.blocklistId }),
+              let trigger = blocklist.triggers.first(where: { $0.id == ids.triggerId }) else {
+            return nil
+        }
+        return (blocklist, trigger)
+    }
+
+    /// Get currently selected independent trigger
+    var selectedTrigger: IndependentTrigger? {
+        guard let id = selectedTriggerId else { return nil }
+        return independentTriggers.first { $0.id == id }
     }
 
     /// Get active block for a blocklist

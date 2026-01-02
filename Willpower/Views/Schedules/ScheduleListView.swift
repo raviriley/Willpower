@@ -8,22 +8,31 @@
 import SwiftUI
 import WillpowerKit
 
-/// Model for editing an existing schedule (used for sheet item binding)
-struct ScheduleEditItem: Identifiable {
-    let id = UUID()
-    let blocklist: BlocklistConfig
-    let trigger: TriggerConfig
-}
-
 struct ScheduleListView: View {
     @Bindable var viewModel: WillpowerViewModel
 
-    @State private var selectedBlocklistForNewSchedule: BlocklistConfig?
-    @State private var scheduleToEdit: ScheduleEditItem?
-
     var body: some View {
         let _ = handlePendingNavigation()
-        List {
+        List(selection: Binding(
+            get: {
+                if let ids = viewModel.selectedScheduleId {
+                    return "\(ids.blocklistId.uuidString):\(ids.triggerId.uuidString)"
+                }
+                return nil
+            },
+            set: { newValue in
+                if let value = newValue {
+                    let parts = value.split(separator: ":")
+                    if parts.count == 2,
+                       let blocklistId = UUID(uuidString: String(parts[0])),
+                       let triggerId = UUID(uuidString: String(parts[1])) {
+                        viewModel.selectedScheduleId = (blocklistId: blocklistId, triggerId: triggerId)
+                    }
+                } else {
+                    viewModel.selectedScheduleId = nil
+                }
+            }
+        )) {
             ForEach(viewModel.blocklists) { blocklist in
                 let schedules = viewModel.scheduleTriggers(for: blocklist)
                 if !schedules.isEmpty {
@@ -34,15 +43,8 @@ struct ScheduleListView: View {
                                 blocklist: blocklist,
                                 viewModel: viewModel
                             )
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                scheduleToEdit = ScheduleEditItem(blocklist: blocklist, trigger: trigger)
-                            }
+                            .tag("\(blocklist.id.uuidString):\(trigger.id.uuidString)")
                             .contextMenu {
-                                Button("Edit") {
-                                    scheduleToEdit = ScheduleEditItem(blocklist: blocklist, trigger: trigger)
-                                }
-                                Divider()
                                 Button("Delete", role: .destructive) {
                                     viewModel.removeSchedule(triggerId: trigger.id, from: blocklist)
                                 }
@@ -59,7 +61,7 @@ struct ScheduleListView: View {
                 Menu {
                     ForEach(viewModel.blocklists) { blocklist in
                         Button(blocklist.name) {
-                            selectedBlocklistForNewSchedule = blocklist
+                            createNewSchedule(for: blocklist)
                         }
                     }
                 } label: {
@@ -67,18 +69,6 @@ struct ScheduleListView: View {
                 }
                 .disabled(viewModel.blocklists.isEmpty)
             }
-        }
-        // Sheet for creating new schedules
-        .sheet(item: $selectedBlocklistForNewSchedule) { blocklist in
-            ScheduleEditorSheet(viewModel: viewModel, blocklist: blocklist)
-        }
-        // Sheet for editing existing schedules
-        .sheet(item: $scheduleToEdit) { editItem in
-            ScheduleEditorSheet(
-                viewModel: viewModel,
-                blocklist: editItem.blocklist,
-                existingTrigger: editItem.trigger
-            )
         }
         .overlay {
             if viewModel.allScheduleTriggers.isEmpty {
@@ -91,7 +81,7 @@ struct ScheduleListView: View {
                         Menu("Add Schedule") {
                             ForEach(viewModel.blocklists) { blocklist in
                                 Button(blocklist.name) {
-                                    selectedBlocklistForNewSchedule = blocklist
+                                    createNewSchedule(for: blocklist)
                                 }
                             }
                         }
@@ -104,16 +94,29 @@ struct ScheduleListView: View {
             }
         }
     }
-    
+
     /// Handle pending navigation from other views (e.g., BlocklistDetailView)
     private func handlePendingNavigation() {
         if let pending = viewModel.pendingScheduleToEdit {
-            // Use async to defer state mutation to after view render
             Task { @MainActor in
-                scheduleToEdit = ScheduleEditItem(blocklist: pending.blocklist, trigger: pending.trigger)
+                viewModel.selectedScheduleId = (blocklistId: pending.blocklist.id, triggerId: pending.trigger.id)
                 viewModel.pendingScheduleToEdit = nil
             }
         }
+    }
+
+    private func createNewSchedule(for blocklist: BlocklistConfig) {
+        // Create a default schedule (9am-5pm weekdays)
+        let defaultWindow = ScheduleBasedTrigger.ScheduleWindow(
+            startHour: 9,
+            startMinute: 0,
+            endHour: 17,
+            endMinute: 0,
+            weekdays: ScheduleBasedTrigger.ScheduleWindow.weekdaysOnly
+        )
+        let schedule = ScheduleBasedTrigger(windows: [defaultWindow])
+        let triggerId = viewModel.addSchedule(to: blocklist, schedule: schedule)
+        viewModel.selectedScheduleId = (blocklistId: blocklist.id, triggerId: triggerId)
     }
 }
 
@@ -158,10 +161,6 @@ struct ScheduleRowView: View {
             }
 
             Spacer()
-
-            Image(systemName: "chevron.right")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
         }
         .padding(.vertical, 4)
     }
