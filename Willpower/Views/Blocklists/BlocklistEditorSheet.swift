@@ -178,9 +178,12 @@ struct BlocklistEditorSheet: View {
                     }
 
                     VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            TextField("Add domain (e.g., youtube.com)", text: $newDomain)
-                                .textFieldStyle(.plain)
+                        HStack(spacing: 8) {
+                            TextField("Add domain", text: $newDomain)
+                                .textFieldStyle(.roundedBorder)
+                                .font(.system(.body, design: .default))
+                                .lineLimit(1)
+                                .truncationMode(.tail)
                                 .onSubmit {
                                     addDomain()
                                 }
@@ -189,9 +192,13 @@ struct BlocklistEditorSheet: View {
                                     domainValidationError = nil
                                 }
 
-                            Button("Add") {
+                            Button {
                                 addDomain()
+                            } label: {
+                                Image(systemName: "plus.circle.fill")
                             }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(newDomain.trimmingCharacters(in: .whitespaces).isEmpty ? Color.secondary : Color.blue)
                             .disabled(newDomain.trimmingCharacters(in: .whitespaces).isEmpty)
                         }
 
@@ -227,7 +234,7 @@ struct BlocklistEditorSheet: View {
                     Button(isEditing ? "Save" : "Create") {
                         save()
                     }
-                    .disabled(!isValid)
+                    .disabled(!isValid || !newDomain.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
             }
         }

@@ -104,8 +104,11 @@ struct TriggerEditorSheet: View {
 
                     // Add new pattern
                     VStack(alignment: .leading, spacing: 8) {
-                        TextField("URL pattern (e.g., youtube.com/shorts)", text: $newPattern)
-                            .textFieldStyle(.plain)
+                        TextField("youtube.com/shorts", text: $newPattern)
+                            .textFieldStyle(.roundedBorder)
+                            .font(.system(.body, design: .monospaced))
+                            .lineLimit(1)
+                            .truncationMode(.tail)
                             .onSubmit { addPattern() }
                             .onChange(of: newPattern) { _, _ in
                                 // Clear error when user starts typing
@@ -134,10 +137,17 @@ struct TriggerEditorSheet: View {
                         }
                         .pickerStyle(.menu)
 
-                        Button("Add Pattern") {
-                            addPattern()
+                        HStack {
+                            Spacer()
+                            Button {
+                                addPattern()
+                            } label: {
+                                Label("Add Pattern", systemImage: "plus.circle.fill")
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.small)
+                            .disabled(newPattern.trimmingCharacters(in: .whitespaces).isEmpty)
                         }
-                        .disabled(newPattern.trimmingCharacters(in: .whitespaces).isEmpty)
                     }
                 }
 
@@ -187,7 +197,7 @@ struct TriggerEditorSheet: View {
                     Button(isEditing ? "Save" : "Create") {
                         saveTrigger()
                     }
-                    .disabled(urlPatterns.isEmpty || triggerName.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .disabled(urlPatterns.isEmpty || triggerName.trimmingCharacters(in: .whitespaces).isEmpty || !newPattern.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
             }
         }
