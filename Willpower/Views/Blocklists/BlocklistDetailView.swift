@@ -29,79 +29,127 @@ struct BlocklistDetailView: View {
         Group {
             if let blocklist {
                 Form {
-                    // Basic Info Section
-                    Section("Blocklist") {
-                        LabeledContent("Name", value: blocklist.name)
-                        LabeledContent("Created", value: blocklist.createdAt.formatted(date: .abbreviated, time: .shortened))
-                        LabeledContent("Last Updated", value: blocklist.updatedAt.formatted(date: .abbreviated, time: .shortened))
+                    // Status & Actions Section (combined)
+                    Section {
+                        if let activeBlock {
+                            // Active state UI
+                            HStack {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    HStack(spacing: 8) {
+                                        StatusBadge(
+                                            text: activeBlock.isLocked ? "LOCKED" : "ACTIVE",
+                                            color: activeBlock.isLocked ? .red : .orange
+                                        )
+                                        Text(activeBlock.reason.displayName)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    if let expiresAt = activeBlock.expiresAt {
+                                        HStack(spacing: 4) {
+                                            Image(systemName: "clock")
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                            TimeRemainingView(expiresAt: expiresAt)
+                                        }
+                                    } else {
+                                        Text("Indefinite duration")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                                Spacer()
+                                if activeBlock.isLocked {
+                                    Image(systemName: "lock.fill")
+                                        .font(.title2)
+                                        .foregroundStyle(.red)
+                                }
+                            }
+                            .padding(.vertical, 4)
+                            
+                            if activeBlock.isLocked {
+                                Label {
+                                    Text("This block cannot be deactivated until it expires")
+                                        .font(.callout)
+                                } icon: {
+                                    Image(systemName: "info.circle")
+                                }
+                                .foregroundStyle(.secondary)
+                            } else {
+                                Button("Deactivate Block", role: .destructive) {
+                                    isShowingDeactivateConfirmation = true
+                                }
+                            }
+                        } else {
+                            // Inactive state UI
+                            HStack {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Inactive")
+                                        .font(.headline)
+                                        .foregroundStyle(.primary)
+                                    Text("This blocklist is not currently blocking any domains")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                            }
+                            .padding(.vertical, 4)
+                            
+                            Button {
+                                viewModel.isShowingActivationSheet = true
+                            } label: {
+                                HStack {
+                                    Image(systemName: "play.fill")
+                                    Text("Activate Now")
+                                }
+                                .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.large)
+                        }
+                    }
+
+                    // Triggers Section
+                    Section {
+                        if blocklist.triggers.isEmpty {
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack {
+                                    Image(systemName: "bolt.slash")
+                                        .foregroundStyle(.secondary)
+                                    Text("No triggers configured")
+                                        .foregroundStyle(.secondary)
+                                }
+                                Text("Triggers automatically activate this blocklist based on schedules or visit counts.")
+                                    .font(.caption)
+                                    .foregroundStyle(.tertiary)
+                            }
+                        } else {
+                            ForEach(blocklist.triggers) { trigger in
+                                TriggerSummaryRow(trigger: trigger)
+                            }
+                        }
+                    } header: {
+                        Text("Triggers")
+                            .padding(.leading, -8)
                     }
 
                     // Domains Section
-                    Section("Blocked Domains (\(blocklist.domains.count))") {
+                    Section {
                         if blocklist.domains.isEmpty {
-                            Text("No domains configured")
-                                .foregroundStyle(.secondary)
-                                .italic()
+                            HStack {
+                                Image(systemName: "globe.badge.chevron.backward")
+                                    .foregroundStyle(.secondary)
+                                Text("No domains configured")
+                                    .foregroundStyle(.secondary)
+                            }
                         } else {
                             ForEach(blocklist.domains, id: \.self) { domain in
                                 Text(domain)
                                     .font(.system(.body, design: .monospaced))
                             }
                         }
-                    }
-
-                    // Status Section
-                    Section("Status") {
-                        if let activeBlock {
-                            LabeledContent("Status") {
-                                StatusBadge(
-                                    text: activeBlock.isLocked ? "LOCKED" : "ACTIVE",
-                                    color: activeBlock.isLocked ? .red : .orange
-                                )
-                            }
-                            if let expiresAt = activeBlock.expiresAt {
-                                LabeledContent("Expires in") {
-                                    TimeRemainingView(expiresAt: expiresAt)
-                                }
-                            } else {
-                                LabeledContent("Expires", value: "Indefinite")
-                            }
-                            LabeledContent("Reason", value: activeBlock.reason.displayName)
-                        } else {
-                            LabeledContent("Status", value: "Inactive")
-                        }
-                    }
-
-                    // Triggers Section
-                    if !blocklist.triggers.isEmpty {
-                        Section("Configured Triggers") {
-                            ForEach(blocklist.triggers) { trigger in
-                                TriggerSummaryRow(trigger: trigger)
-                            }
-                        }
-                    }
-
-                    // Actions Section
-                    Section("Actions") {
-                        if let activeBlock {
-                            if activeBlock.isLocked {
-                                HStack {
-                                    Image(systemName: "lock.fill")
-                                        .foregroundStyle(.red)
-                                    Text("Block is locked and cannot be deactivated until it expires")
-                                        .font(.callout)
-                                        .foregroundStyle(.secondary)
-                                }
-                            } else {
-                                Button("Deactivate", role: .destructive) {
-                                    isShowingDeactivateConfirmation = true
-                                }
-                            }
-                        } else {
-                            Button("Activate Now...") {
-                                viewModel.isShowingActivationSheet = true
-                            }
-                        }
+                    } header: {
+                        Text("Blocked Domains (\(blocklist.domains.count))")
+                            .padding(.leading, -8)
                     }
                 }
                 .formStyle(.grouped)
