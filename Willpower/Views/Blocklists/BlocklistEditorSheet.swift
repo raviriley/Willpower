@@ -83,7 +83,7 @@ struct BlocklistEditorSheet: View {
     var isEditing: Bool { blocklist != nil }
 
     var isValid: Bool {
-        !name.trimmingCharacters(in: .whitespaces).isEmpty
+        !name.trimmingCharacters(in: .whitespaces).isEmpty && !domains.isEmpty
     }
 
     /// Check if this blocklist has an active (non-expired) block
