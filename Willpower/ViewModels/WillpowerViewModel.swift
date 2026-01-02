@@ -280,6 +280,24 @@ final class WillpowerViewModel {
         syncBlocklistsToIPC()
     }
 
+    /// Import a full blocklist (preserves triggers/schedules)
+    func importBlocklist(_ blocklist: BlocklistConfig) {
+        // Create new blocklist with fresh ID but preserve triggers
+        var imported = BlocklistConfig(
+            name: blocklist.name,
+            domains: blocklist.domains.map { cleanDomain($0) }.filter { !$0.isEmpty }
+        )
+        imported.triggers = blocklist.triggers
+        imported.isActive = false  // Don't auto-activate imported blocklists
+
+        // Update local state first
+        blocklists.append(imported)
+        saveLocalState()
+
+        // Try to sync to IPC (best effort)
+        syncBlocklistsToIPC()
+    }
+
     /// Update an existing blocklist
     func updateBlocklist(_ blocklist: BlocklistConfig) {
         guard let index = blocklists.firstIndex(where: { $0.id == blocklist.id }) else { return }

@@ -77,16 +77,16 @@ struct SettingsView: View {
             // MARK: - Data Section
             Section {
                 Button {
-                    exportBlocklists()
+                    exportData()
                 } label: {
-                    Label("Export Blocklists", systemImage: "square.and.arrow.up")
+                    Label("Export Data", systemImage: "square.and.arrow.up")
                 }
                 .buttonStyle(.borderless)
 
                 Button {
                     isShowingImportSheet = true
                 } label: {
-                    Label("Import Blocklists", systemImage: "square.and.arrow.down")
+                    Label("Import Data", systemImage: "square.and.arrow.down")
                 }
                 .buttonStyle(.borderless)
 
@@ -218,14 +218,14 @@ struct SettingsView: View {
         }
     }
 
-    private func exportBlocklists() {
-        let exportData = ExportData(
+    private func exportData() {
+        let export = ExportData(
             blocklists: viewModel.blocklists,
             triggers: viewModel.independentTriggers,
             exportedAt: Date()
         )
 
-        guard let jsonData = try? JSONEncoder().encode(exportData),
+        guard let jsonData = try? JSONEncoder().encode(export),
               let jsonString = String(data: jsonData, encoding: .utf8) else {
             return
         }
@@ -233,7 +233,7 @@ struct SettingsView: View {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.json]
         panel.nameFieldStringValue = "willpower-backup.json"
-        panel.title = "Export Blocklists"
+        panel.title = "Export Data"
 
         if panel.runModal() == .OK, let url = panel.url {
             try? jsonString.write(to: url, atomically: true, encoding: .utf8)
@@ -258,9 +258,10 @@ struct SettingsView: View {
         }
 
         // Merge imported blocklists (avoid duplicates by name)
+        // Import full blocklist including triggers/schedules
         for blocklist in importData.blocklists {
             if !viewModel.blocklists.contains(where: { $0.name == blocklist.name }) {
-                viewModel.createBlocklist(name: blocklist.name, domains: blocklist.domains)
+                viewModel.importBlocklist(blocklist)
             }
         }
 
