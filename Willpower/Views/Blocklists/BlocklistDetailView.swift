@@ -25,6 +25,19 @@ struct BlocklistDetailView: View {
         return viewModel.activeBlock(for: blocklist)
     }
 
+    /// Independent triggers that target this blocklist
+    var targetingTriggers: [IndependentTrigger] {
+        guard let blocklist else { return [] }
+        return viewModel.independentTriggers.filter { trigger in
+            trigger.urlPatterns.contains { pattern in
+                if case .activateBlocklist(let targetId) = pattern.blockAction {
+                    return targetId == blocklist.id
+                }
+                return false
+            }
+        }
+    }
+
     var body: some View {
         Group {
             if let blocklist {
@@ -110,7 +123,7 @@ struct BlocklistDetailView: View {
 
                     // Triggers Section
                     Section {
-                        if blocklist.triggers.isEmpty {
+                        if blocklist.triggers.isEmpty && targetingTriggers.isEmpty {
                             VStack(alignment: .leading, spacing: 4) {
                                 HStack {
                                     Image(systemName: "bolt.slash")
@@ -123,8 +136,21 @@ struct BlocklistDetailView: View {
                                     .foregroundStyle(.tertiary)
                             }
                         } else {
+                            // Embedded triggers (schedules, etc.)
                             ForEach(blocklist.triggers) { trigger in
-                                TriggerSummaryRow(trigger: trigger)
+                                TriggerSummaryRow(
+                                    trigger: trigger,
+                                    blocklist: blocklist,
+                                    viewModel: viewModel
+                                )
+                            }
+
+                            // Independent triggers that target this blocklist
+                            ForEach(targetingTriggers) { trigger in
+                                IndependentTriggerSummaryRow(
+                                    trigger: trigger,
+                                    viewModel: viewModel
+                                )
                             }
                         }
                     } header: {
@@ -190,28 +216,60 @@ struct BlocklistDetailView: View {
 
 struct TriggerSummaryRow: View {
     let trigger: TriggerConfig
+    let blocklist: BlocklistConfig
+    @Bindable var viewModel: WillpowerViewModel
 
     var body: some View {
-        HStack {
-            Image(systemName: trigger.type.icon)
-                .foregroundStyle(trigger.isEnabled ? .blue : .gray)
+        Button {
+            navigateToTrigger()
+        } label: {
+            HStack {
+                Image(systemName: trigger.type.icon)
+                    .foregroundStyle(trigger.isEnabled ? .blue : .gray)
 
-            VStack(alignment: .leading) {
-                Text(trigger.type.displayName)
-                    .font(.subheadline)
+                VStack(alignment: .leading) {
+                    Text(trigger.type.displayName)
+                        .font(.subheadline)
 
-                Text(trigger.summary)
+                    Text(trigger.summary)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                if !trigger.isEnabled {
+                    Text("Disabled")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                
+                Image(systemName: "chevron.right")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.tertiary)
             }
-
-            Spacer()
-
-            if !trigger.isEnabled {
-                Text("Disabled")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+    
+    private func navigateToTrigger() {
+        switch trigger.type {
+        case .scheduleBased:
+            // Navigate to Schedules and open editor for this schedule
+            viewModel.pendingScheduleToEdit = (blocklist: blocklist, trigger: trigger)
+            viewModel.selectedCategory = .schedules
+            
+        case .visitCount:
+            // Navigate to Triggers page
+            // Note: blocklist visit-count triggers are different from independent triggers
+            // Just navigate to the page for now
+            viewModel.selectedCategory = .triggers
+            
+        case .timeBased:
+            // Time-based triggers are typically one-off activations, not persistent configs
+            // No specific navigation needed
+            break
         }
     }
 }
@@ -252,18 +310,79 @@ extension TriggerConfig {
             return "Not configured"
 
         case .scheduleBased:
-            if let sb = scheduleBased {
-                let windowCount = sb.windows.count
-                return "\(windowCount) schedule window\(windowCount == 1 ? "" : "s")"
+            if let sb = scheduleBased, let window = sb.windows.first {
+                return "\(window.timeRangeDescription) \(window.weekdaysDescription)"
             }
             return "Not configured"
 
         case .visitCount:
             if let vc = visitCount {
-                return "After \(vc.maxVisits) visits, block for \(formatDuration(vc.blockDurationSeconds))"
+                let visitWord = vc.maxVisits == 1 ? "visit" : "visits"
+                return "After \(vc.maxVisits) \(visitWord), block for \(formatDuration(vc.blockDurationSeconds))"
             }
             return "Not configured"
         }
+    }
+
+    private func formatDuration(_ seconds: Int) -> String {
+        let hours = seconds / 3600
+        let minutes = (seconds % 3600) / 60
+
+        if hours > 0 && minutes > 0 {
+            return "\(hours)h \(minutes)m"
+        } else if hours > 0 {
+            return "\(hours) hour\(hours == 1 ? "" : "s")"
+        } else {
+            return "\(minutes) minute\(minutes == 1 ? "" : "s")"
+        }
+    }
+}
+
+// MARK: - Independent Trigger Summary Row
+
+struct IndependentTriggerSummaryRow: View {
+    let trigger: IndependentTrigger
+    @Bindable var viewModel: WillpowerViewModel
+
+    var body: some View {
+        Button {
+            // Navigate to Triggers page and open editor for this trigger
+            viewModel.pendingTriggerToEdit = trigger
+            viewModel.selectedCategory = .triggers
+        } label: {
+            HStack {
+                Image(systemName: "eye.trianglebadge.exclamationmark")
+                    .foregroundStyle(trigger.isEnabled ? .orange : .gray)
+
+                VStack(alignment: .leading) {
+                    Text(trigger.name)
+                        .font(.subheadline)
+
+                    Text(triggerSummary)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                if !trigger.isEnabled {
+                    Text("Disabled")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var triggerSummary: String {
+        let visitWord = trigger.maxVisits == 1 ? "visit" : "visits"
+        return "After \(trigger.maxVisits) \(visitWord), block for \(formatDuration(trigger.blockDurationSeconds))"
     }
 
     private func formatDuration(_ seconds: Int) -> String {
