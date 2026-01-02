@@ -22,6 +22,7 @@ struct ScheduleListView: View {
     @State private var scheduleToEdit: ScheduleEditItem?
 
     var body: some View {
+        let _ = handlePendingNavigation()
         List {
             ForEach(viewModel.blocklists) { blocklist in
                 let schedules = viewModel.scheduleTriggers(for: blocklist)
@@ -100,6 +101,17 @@ struct ScheduleListView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+            }
+        }
+    }
+    
+    /// Handle pending navigation from other views (e.g., BlocklistDetailView)
+    private func handlePendingNavigation() {
+        if let pending = viewModel.pendingScheduleToEdit {
+            // Use async to defer state mutation to after view render
+            Task { @MainActor in
+                scheduleToEdit = ScheduleEditItem(blocklist: pending.blocklist, trigger: pending.trigger)
+                viewModel.pendingScheduleToEdit = nil
             }
         }
     }

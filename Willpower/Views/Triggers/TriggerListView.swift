@@ -17,6 +17,7 @@ struct TriggerListView: View {
     @State private var isShowingDeleteConfirmation = false
 
     var body: some View {
+        let _ = handlePendingNavigation()
         List {
             ForEach(viewModel.independentTriggers) { trigger in
                 TriggerRowView(trigger: trigger, viewModel: viewModel)
@@ -87,6 +88,17 @@ struct TriggerListView: View {
                     }
                     .buttonStyle(.borderedProminent)
                 }
+            }
+        }
+    }
+    
+    /// Handle pending navigation from other views (e.g., BlocklistDetailView)
+    private func handlePendingNavigation() {
+        if let pending = viewModel.pendingTriggerToEdit {
+            // Use async to defer state mutation to after view render
+            Task { @MainActor in
+                triggerToEdit = pending
+                viewModel.pendingTriggerToEdit = nil
             }
         }
     }

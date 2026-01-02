@@ -74,6 +74,12 @@ final class WillpowerViewModel {
     var isShowingActivationSheet: Bool = false
     var errorMessage: String?
     var isLoading: Bool = false
+    
+    // Cross-view navigation
+    /// Pending schedule to edit (set before navigating to schedules)
+    var pendingScheduleToEdit: (blocklist: BlocklistConfig, trigger: TriggerConfig)?
+    /// Pending independent trigger to edit (set before navigating to triggers)
+    var pendingTriggerToEdit: IndependentTrigger?
 
     // MARK: - Private
 
