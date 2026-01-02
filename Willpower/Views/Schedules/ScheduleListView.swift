@@ -170,8 +170,19 @@ struct ScheduleRowView: View {
 
 extension ScheduleBasedTrigger.ScheduleWindow {
     var timeRangeDescription: String {
-        let startTime = String(format: "%02d:%02d", startHour, startMinute)
-        let endTime = String(format: "%02d:%02d", endHour, endMinute)
+        func format12Hour(_ hour: Int, _ minute: Int) -> String {
+            let isAM = hour < 12
+            var hour12 = hour % 12
+            if hour12 == 0 { hour12 = 12 }
+            let period = isAM ? "AM" : "PM"
+            if minute == 0 {
+                return "\(hour12) \(period)"
+            } else {
+                return "\(hour12):\(String(format: "%02d", minute)) \(period)"
+            }
+        }
+        let startTime = format12Hour(startHour, startMinute)
+        let endTime = format12Hour(endHour, endMinute)
         return "\(startTime) - \(endTime)"
     }
 

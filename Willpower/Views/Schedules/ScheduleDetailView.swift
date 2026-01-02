@@ -11,14 +11,37 @@ import WillpowerKit
 struct ScheduleDetailView: View {
     @Bindable var viewModel: WillpowerViewModel
 
-    // Time window configuration
+    // Time window configuration (stored in 24-hour format internally)
     @State private var startHour: Int = 9
     @State private var startMinute: Int = 0
     @State private var endHour: Int = 17
     @State private var endMinute: Int = 0
     @State private var selectedWeekdays: Set<Int> = ScheduleBasedTrigger.ScheduleWindow.weekdaysOnly
 
+    // 12-hour display state
+    @State private var startDisplayHour: Int = 9
+    @State private var startIsAM: Bool = true
+    @State private var endDisplayHour: Int = 5
+    @State private var endIsAM: Bool = false
+
     @State private var isShowingDeleteConfirmation = false
+
+    // MARK: - 12/24 Hour Conversion Helpers
+
+    private func to12Hour(_ hour24: Int) -> (hour: Int, isAM: Bool) {
+        let isAM = hour24 < 12
+        var hour12 = hour24 % 12
+        if hour12 == 0 { hour12 = 12 }
+        return (hour12, isAM)
+    }
+
+    private func to24Hour(_ hour12: Int, isAM: Bool) -> Int {
+        if isAM {
+            return hour12 == 12 ? 0 : hour12
+        } else {
+            return hour12 == 12 ? 12 : hour12 + 12
+        }
+    }
 
     /// Get the current schedule from viewModel (always fresh)
     var schedule: (blocklist: BlocklistConfig, trigger: TriggerConfig)? {
@@ -69,17 +92,17 @@ struct ScheduleDetailView: View {
 
                     // Time Range Section
                     Section("Time Range") {
-                        Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 0) {
+                        Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 0) {
                             GridRow {
                                 // Start time
                                 HStack(spacing: 4) {
-                                    Picker("Hour", selection: $startHour) {
-                                        ForEach(0..<24, id: \.self) {
-                                            Text(String(format: "%02d", $0)).tag($0)
+                                    Picker("Hour", selection: $startDisplayHour) {
+                                        ForEach(1...12, id: \.self) {
+                                            Text("\($0)").tag($0)
                                         }
                                     }
                                     .labelsHidden()
-                                    .frame(width: 60)
+                                    .frame(width: 50)
 
                                     Text(":")
                                         .foregroundStyle(.secondary)
@@ -90,7 +113,14 @@ struct ScheduleDetailView: View {
                                         }
                                     }
                                     .labelsHidden()
-                                    .frame(width: 60)
+                                    .frame(width: 50)
+
+                                    Picker("AM/PM", selection: $startIsAM) {
+                                        Text("AM").tag(true)
+                                        Text("PM").tag(false)
+                                    }
+                                    .labelsHidden()
+                                    .frame(width: 55)
                                 }
 
                                 // Arrow
@@ -100,13 +130,13 @@ struct ScheduleDetailView: View {
 
                                 // End time
                                 HStack(spacing: 4) {
-                                    Picker("Hour", selection: $endHour) {
-                                        ForEach(0..<24, id: \.self) {
-                                            Text(String(format: "%02d", $0)).tag($0)
+                                    Picker("Hour", selection: $endDisplayHour) {
+                                        ForEach(1...12, id: \.self) {
+                                            Text("\($0)").tag($0)
                                         }
                                     }
                                     .labelsHidden()
-                                    .frame(width: 60)
+                                    .frame(width: 50)
 
                                     Text(":")
                                         .foregroundStyle(.secondary)
@@ -117,7 +147,14 @@ struct ScheduleDetailView: View {
                                         }
                                     }
                                     .labelsHidden()
-                                    .frame(width: 60)
+                                    .frame(width: 50)
+
+                                    Picker("AM/PM", selection: $endIsAM) {
+                                        Text("AM").tag(true)
+                                        Text("PM").tag(false)
+                                    }
+                                    .labelsHidden()
+                                    .frame(width: 55)
                                 }
                             }
                         }
@@ -147,9 +184,23 @@ struct ScheduleDetailView: View {
                 }
                 .formStyle(.grouped)
                 .navigationTitle("Schedule")
-                .onChange(of: startHour) { _, _ in saveIfValid() }
+                .onChange(of: startDisplayHour) { _, newValue in
+                    startHour = to24Hour(newValue, isAM: startIsAM)
+                    saveIfValid()
+                }
+                .onChange(of: startIsAM) { _, newValue in
+                    startHour = to24Hour(startDisplayHour, isAM: newValue)
+                    saveIfValid()
+                }
                 .onChange(of: startMinute) { _, _ in saveIfValid() }
-                .onChange(of: endHour) { _, _ in saveIfValid() }
+                .onChange(of: endDisplayHour) { _, newValue in
+                    endHour = to24Hour(newValue, isAM: endIsAM)
+                    saveIfValid()
+                }
+                .onChange(of: endIsAM) { _, newValue in
+                    endHour = to24Hour(endDisplayHour, isAM: newValue)
+                    saveIfValid()
+                }
                 .onChange(of: endMinute) { _, _ in saveIfValid() }
                 .onChange(of: selectedWeekdays) { _, _ in saveIfValid() }
                 .alert("Delete Schedule?", isPresented: $isShowingDeleteConfirmation) {
@@ -180,11 +231,21 @@ struct ScheduleDetailView: View {
         if let trigger = schedule?.trigger,
            let scheduleConfig = trigger.scheduleBased,
            let window = scheduleConfig.windows.first {
+            // Load 24-hour values
             startHour = window.startHour
             startMinute = window.startMinute
             endHour = window.endHour
             endMinute = window.endMinute
             selectedWeekdays = window.weekdays
+
+            // Convert to 12-hour display
+            let start12 = to12Hour(window.startHour)
+            startDisplayHour = start12.hour
+            startIsAM = start12.isAM
+
+            let end12 = to12Hour(window.endHour)
+            endDisplayHour = end12.hour
+            endIsAM = end12.isAM
         }
     }
 
