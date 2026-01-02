@@ -11,11 +11,27 @@ import WillpowerKit
 struct ActiveBlockRowView: View {
     let block: ActiveBlock
     let blocklist: BlocklistConfig?
+    /// For independent trigger blocks, the trigger name (since blocklist will be nil)
+    var triggerName: String?
+
+    /// Display name for the block source
+    private var sourceName: String {
+        if let blocklist {
+            return blocklist.name
+        } else if let triggerName {
+            return triggerName
+        } else if block.reason == .visitCountTrigger {
+            // Fallback: show the domain being blocked
+            return block.domains.first ?? "Visit Trigger"
+        } else {
+            return "Unknown"
+        }
+    }
 
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
-                Text(blocklist?.name ?? "Unknown Blocklist")
+                Text(sourceName)
                     .font(.headline)
 
                 Text("\(block.domains.count) domains blocked")

@@ -258,8 +258,9 @@ final class WillpowerViewModel {
             if blocklists.isEmpty || independentTriggers.isEmpty {
                 loadLocalState()
             }
-            activeBlocks = []
-            visitRecords = []
+            // Don't clear activeBlocks/visitRecords when daemon appears down briefly
+            // This prevents UI flickering due to momentary heartbeat delays
+            // The blocks will naturally expire based on their expiresAt time
         }
     }
 

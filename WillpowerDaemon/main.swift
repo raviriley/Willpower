@@ -152,12 +152,21 @@ func processCommands(
             mutableState.lastUpdated = Date()
 
             // Clean up orphaned active blocks (blocks for deleted blocklists)
+            // NOTE: Skip blocks from independent visit-count triggers - they use pattern.id as blocklistId
             let validBlocklistIds = Set(blocklists.map { $0.id })
-            let orphanedBlocks = mutableState.activeBlocks.filter { !validBlocklistIds.contains($0.blocklistId) }
+            let orphanedBlocks = mutableState.activeBlocks.filter { block in
+                // Don't consider visit-count trigger blocks as orphaned
+                // They use pattern.id as blocklistId, not an actual blocklist ID
+                guard block.reason != .visitCountTrigger else { return false }
+                return !validBlocklistIds.contains(block.blocklistId)
+            }
 
             if !orphanedBlocks.isEmpty {
                 print("[WillpowerDaemon] Cleaning up \(orphanedBlocks.count) orphaned active block(s)")
-                mutableState.activeBlocks.removeAll { !validBlocklistIds.contains($0.blocklistId) }
+                mutableState.activeBlocks.removeAll { block in
+                    guard block.reason != .visitCountTrigger else { return false }
+                    return !validBlocklistIds.contains(block.blocklistId)
+                }
             }
 
             // Sync NEW domains to active blocks (add-only, never remove)

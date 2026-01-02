@@ -11,6 +11,19 @@ import WillpowerKit
 struct StatusDashboardView: View {
     var viewModel: WillpowerViewModel
 
+    /// Find trigger name for a visit-count block (blocklistId is actually pattern.id)
+    private func triggerName(for block: ActiveBlock) -> String? {
+        guard block.reason == .visitCountTrigger else { return nil }
+
+        // For independent triggers, blocklistId is the pattern.id
+        for trigger in viewModel.independentTriggers {
+            if trigger.urlPatterns.contains(where: { $0.id == block.blocklistId }) {
+                return trigger.name
+            }
+        }
+        return nil
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
@@ -43,7 +56,8 @@ struct StatusDashboardView: View {
                             ForEach(viewModel.activeBlocks) { block in
                                 ActiveBlockRowView(
                                     block: block,
-                                    blocklist: viewModel.blocklists.first { $0.id == block.blocklistId }
+                                    blocklist: viewModel.blocklists.first { $0.id == block.blocklistId },
+                                    triggerName: triggerName(for: block)
                                 )
                                 if block.id != viewModel.activeBlocks.last?.id {
                                     Divider()
