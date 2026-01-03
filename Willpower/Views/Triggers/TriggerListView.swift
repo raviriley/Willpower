@@ -90,7 +90,7 @@ struct TriggerListView: View {
             associatedDomain: "example.com"
         )
         let newTrigger = IndependentTrigger(
-            name: "New Trigger",
+            name: "",
             urlPatterns: [defaultPattern],
             maxVisits: 5,
             blockDurationSeconds: 3600
@@ -147,35 +147,21 @@ struct TriggerRowView: View {
                     }
                 }
 
-                // Show patterns with visit counts
-                ForEach(trigger.urlPatterns) { pattern in
-                    HStack(spacing: 4) {
-                        Text(pattern.pattern)
-                            .font(.system(.caption, design: .monospaced))
-                            .foregroundStyle(.secondary)
-
-                        Text(blockActionBadge(for: pattern))
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
-                    }
-                }
-
-                HStack {
-                    // Visit count badge
-                    Text("\(totalVisits)/\(trigger.maxVisits)")
+                HStack(spacing: 6) {
+                    Text("\(totalVisits)/\(trigger.maxVisits) visits")
                         .font(.caption)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(visitCountColor(totalVisits, max: trigger.maxVisits).opacity(0.2))
                         .foregroundStyle(visitCountColor(totalVisits, max: trigger.maxVisits))
-                        .clipShape(Capsule())
-
+                    
+                    Text("→")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                    
                     if isActive {
-                        Text("Active")
+                        Text("blocking")
                             .font(.caption)
                             .foregroundStyle(.red)
                     } else {
-                        Text("Block for \(formatDuration(trigger.blockDurationSeconds))")
+                        Text("block for \(formatDuration(trigger.blockDurationSeconds))")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -185,18 +171,6 @@ struct TriggerRowView: View {
             Spacer()
         }
         .padding(.vertical, 4)
-    }
-
-    private func blockActionBadge(for pattern: URLPattern) -> String {
-        switch pattern.blockAction {
-        case .blockDomain:
-            return "→ \(pattern.associatedDomain)"
-        case .activateBlocklist(let blocklistId):
-            if let blocklist = viewModel.blocklists.first(where: { $0.id == blocklistId }) {
-                return "→ \(blocklist.name)"
-            }
-            return "→ blocklist"
-        }
     }
 
     private func visitCountColor(_ count: Int, max: Int) -> Color {
