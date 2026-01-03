@@ -26,7 +26,8 @@ let ipcManager = IPCManager()
 let triggerEvaluator = TriggerEvaluator()
 
 /// Track previous blocked domains to detect changes (must be before dispatchMain)
-var previousBlockedDomains = Set<String>()
+/// nil = never synced (force initial sync), empty = synced with no domains
+var previousBlockedDomains: Set<String>? = nil
 
 // NOTE: BrowserMonitor runs in the app, not the daemon.
 // The daemon runs as root and doesn't have access to user's GUI session
@@ -536,8 +537,8 @@ func applyBlocks(
         }
     }
 
-    // Check if domains changed
-    guard allDomains != previousBlockedDomains else {
+    // Check if domains changed (nil = never synced, always sync on first run)
+    if let previous = previousBlockedDomains, allDomains == previous {
         return  // No change, skip updates
     }
 
