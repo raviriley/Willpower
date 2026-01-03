@@ -442,7 +442,7 @@ func evaluateTriggers(
                         domains: blocklist.domains,
                         expiresAt: expiresAt,
                         reason: .scheduleBasedTrigger,
-                        isLocked: false  // Schedule blocks are unlocked (natural expiry)
+                        isLocked: true  // Schedule blocks are locked (controlled by schedule)
                     )
 
                     mutableState.activeBlocks.append(block)
