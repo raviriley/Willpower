@@ -140,7 +140,7 @@ struct TriggerDetailView: View {
                                 .toggleStyle(.checkbox)
                                 .fixedSize()
 
-                                TextField("", text: $newPattern, prompt: Text(newPatternIsRegex ? "twitter\\.com/.*/status/\\d+" : "youtube.com/shorts"))
+                                TextField("", text: $newPattern, prompt: Text(newPatternIsRegex ? "(?:twitter\\.com|x\\.com)/[^/]+/status/\\d+" : "youtube.com/shorts"))
                                     .textFieldStyle(.roundedBorder)
                                     .font(.system(.body, design: .monospaced))
                                     .lineLimit(1)
