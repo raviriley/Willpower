@@ -128,47 +128,45 @@ struct TriggerDetailView: View {
                         }
 
                         // Add new pattern
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Add URL Pattern")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
+                        VStack(alignment: .leading, spacing: 12) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Pattern")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                HStack(spacing: 8) {
+                                    TextField("", text: $newPattern, prompt: Text(newPatternIsRegex ? "(?:twitter\\.com|x\\.com)/[^/]+/status/\\d+" : "youtube.com/shorts"))
+                                        .textFieldStyle(.roundedBorder)
+                                        .font(.system(.body, design: .monospaced))
+                                        .onSubmit { addPattern() }
+                                        .onChange(of: newPattern) { _, _ in
+                                            patternValidationError = nil
+                                        }
 
-                            HStack(spacing: 8) {
-                                Toggle(isOn: $newPatternIsRegex) {
-                                    Text("Regex")
-                                }
-                                .toggleStyle(.checkbox)
-                                .fixedSize()
-
-                                TextField("", text: $newPattern, prompt: Text(newPatternIsRegex ? "(?:twitter\\.com|x\\.com)/[^/]+/status/\\d+" : "youtube.com/shorts"))
-                                    .textFieldStyle(.roundedBorder)
-                                    .font(.system(.body, design: .monospaced))
-                                    .lineLimit(1)
-                                    .onSubmit { addPattern() }
-                                    .onChange(of: newPattern) { _, _ in
-                                        patternValidationError = nil
+                                    Button {
+                                        addPattern()
+                                    } label: {
+                                        Image(systemName: "plus.circle.fill")
                                     }
-
-                                Button {
-                                    addPattern()
-                                } label: {
-                                    Image(systemName: "plus.circle.fill")
+                                    .buttonStyle(.plain)
+                                    .foregroundStyle(newPattern.trimmingCharacters(in: .whitespaces).isEmpty ? Color.secondary : Color.blue)
+                                    .disabled(newPattern.trimmingCharacters(in: .whitespaces).isEmpty)
                                 }
-                                .buttonStyle(.plain)
-                                .foregroundStyle(newPattern.trimmingCharacters(in: .whitespaces).isEmpty ? Color.secondary : Color.blue)
-                                .disabled(newPattern.trimmingCharacters(in: .whitespaces).isEmpty)
                             }
+
+                            Toggle(isOn: $newPatternIsRegex) {
+                                Text("Use Regex")
+                            }
+                            .toggleStyle(.checkbox)
 
                             // Show domain field when regex is enabled (can't auto-extract from regex)
                             if newPatternIsRegex {
-                                HStack {
-                                    Text("Domain to block:")
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Domain to block")
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
                                     TextField("", text: $newPatternDomain, prompt: Text("twitter.com"))
                                         .textFieldStyle(.roundedBorder)
                                         .font(.system(.body, design: .monospaced))
-                                        .frame(maxWidth: 200)
                                 }
                             }
 
