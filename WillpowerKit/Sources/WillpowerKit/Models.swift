@@ -146,19 +146,15 @@ public struct VisitCountTrigger: Codable, Sendable, Equatable {
     public var maxVisits: Int
     /// How long to block once triggered (in seconds)
     public var blockDurationSeconds: Int
-    /// Optional: reset visit count after N seconds (nil = never reset automatically)
-    public var resetIntervalSeconds: Int?
 
     public init(
         urlPatterns: [URLPattern],
         maxVisits: Int,
-        blockDurationSeconds: Int,
-        resetIntervalSeconds: Int? = nil
+        blockDurationSeconds: Int
     ) {
         self.urlPatterns = urlPatterns
         self.maxVisits = maxVisits
         self.blockDurationSeconds = blockDurationSeconds
-        self.resetIntervalSeconds = resetIntervalSeconds
     }
 }
 
@@ -174,8 +170,6 @@ public struct IndependentTrigger: Codable, Sendable, Identifiable, Hashable, Equ
     public var urlPatterns: [URLPattern]
     /// Number of visits before blocking is triggered
     public var maxVisits: Int
-    /// Time window for counting visits (in minutes, 0 = no window)
-    public var windowMinutes: Int
     /// How long to block once triggered (in seconds)
     public var blockDurationSeconds: Int
     /// Whether this trigger is currently enabled
@@ -188,7 +182,6 @@ public struct IndependentTrigger: Codable, Sendable, Identifiable, Hashable, Equ
         name: String,
         urlPatterns: [URLPattern],
         maxVisits: Int,
-        windowMinutes: Int = 0,
         blockDurationSeconds: Int,
         isEnabled: Bool = true,
         createdAt: Date = Date(),
@@ -198,7 +191,6 @@ public struct IndependentTrigger: Codable, Sendable, Identifiable, Hashable, Equ
         self.name = name
         self.urlPatterns = urlPatterns
         self.maxVisits = maxVisits
-        self.windowMinutes = windowMinutes
         self.blockDurationSeconds = blockDurationSeconds
         self.isEnabled = isEnabled
         self.createdAt = createdAt

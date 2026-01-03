@@ -197,25 +197,15 @@ public struct TriggerEvaluator: Sendable {
 
         // Sum visits across all monitored patterns
         var totalVisits = 0
-        let now = Date()
 
         for pattern in config.urlPatterns {
             if let record = visitRecords.first(where: { $0.patternId == pattern.id }) {
-                // Check if we should reset based on interval
-                if let resetInterval = config.resetIntervalSeconds {
-                    let elapsed = now.timeIntervalSince(record.firstVisitAt)
-                    if elapsed < TimeInterval(resetInterval) {
-                        totalVisits += record.visitCount
-                    }
-                    // If elapsed >= resetInterval, count is effectively 0
-                } else {
-                    totalVisits += record.visitCount
-                }
+                totalVisits += record.visitCount
             }
         }
 
         if totalVisits >= config.maxVisits {
-            let expiresAt = now.addingTimeInterval(TimeInterval(config.blockDurationSeconds))
+            let expiresAt = Date().addingTimeInterval(TimeInterval(config.blockDurationSeconds))
             return .active(expiresAt: expiresAt)
         }
 
