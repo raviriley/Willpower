@@ -56,7 +56,7 @@ struct TriggerDetailView: View {
                 Form {
                     // Trigger Name
                     Section("Trigger Name") {
-                        TextField("Name (e.g., Social Media Limit)", text: $triggerName)
+                        TextField("", text: $triggerName, prompt: Text("Limit Doomscrolling"))
                     }
 
                     // Status Section
