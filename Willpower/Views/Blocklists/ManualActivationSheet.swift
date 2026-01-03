@@ -134,7 +134,7 @@ struct ManualActivationSheet: View {
             if isLocked {
                 Label("This block cannot be cancelled once started", systemImage: "exclamationmark.triangle.fill")
                     .font(.callout)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(.orange.opacity(0.8))
             }
 
             Spacer()

@@ -102,7 +102,7 @@ struct SettingsView: View {
             } footer: {
                 if hasLockedBlocks {
                     Text("Cannot reset data while locked blocks are active.")
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(.orange.opacity(0.8))
                 }
             }
 

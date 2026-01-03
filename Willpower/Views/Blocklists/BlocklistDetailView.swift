@@ -353,7 +353,7 @@ struct BlocklistDetailView: View {
                     } footer: {
                         if isBlocklistActive {
                             Text("New domains will be blocked immediately.")
-                                .foregroundStyle(.orange)
+                                .foregroundStyle(.orange.opacity(0.8))
                         } else {
                             Text("You can paste URLs and they will be cleaned automatically.")
                                 .foregroundStyle(.secondary)
