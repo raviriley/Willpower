@@ -18,6 +18,7 @@ struct TriggerDetailView: View {
 
     @State private var newPattern: String = ""
     @State private var newPatternIsRegex: Bool = false
+    @State private var newPatternDomain: String = ""  // Domain to block (required for regex)
     @State private var newPatternBlockAction: BlockAction = .blockDomain
     @State private var patternValidationError: String?
 
@@ -131,15 +132,15 @@ struct TriggerDetailView: View {
                             Text("Add URL Pattern")
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
-                            
+
                             HStack(spacing: 8) {
                                 Toggle(isOn: $newPatternIsRegex) {
-                                    Text("Use Regex")
+                                    Text("Regex")
                                 }
                                 .toggleStyle(.checkbox)
                                 .fixedSize()
-                                
-                                TextField("", text: $newPattern, prompt: Text("youtube.com/shorts").foregroundColor(.secondary))
+
+                                TextField("", text: $newPattern, prompt: Text(newPatternIsRegex ? "twitter\\.com/.*/status/\\d+" : "youtube.com/shorts"))
                                     .textFieldStyle(.roundedBorder)
                                     .font(.system(.body, design: .monospaced))
                                     .lineLimit(1)
@@ -147,7 +148,7 @@ struct TriggerDetailView: View {
                                     .onChange(of: newPattern) { _, _ in
                                         patternValidationError = nil
                                     }
-                                
+
                                 Button {
                                     addPattern()
                                 } label: {
@@ -156,6 +157,19 @@ struct TriggerDetailView: View {
                                 .buttonStyle(.plain)
                                 .foregroundStyle(newPattern.trimmingCharacters(in: .whitespaces).isEmpty ? Color.secondary : Color.blue)
                                 .disabled(newPattern.trimmingCharacters(in: .whitespaces).isEmpty)
+                            }
+
+                            // Show domain field when regex is enabled (can't auto-extract from regex)
+                            if newPatternIsRegex {
+                                HStack {
+                                    Text("Domain to block:")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                    TextField("", text: $newPatternDomain, prompt: Text("twitter.com"))
+                                        .textFieldStyle(.roundedBorder)
+                                        .font(.system(.body, design: .monospaced))
+                                        .frame(maxWidth: 200)
+                                }
                             }
 
                             if let error = patternValidationError {
@@ -237,30 +251,41 @@ struct TriggerDetailView: View {
     }
 
     private func addPattern() {
-        let cleaned = cleanURLPattern(newPattern)
+        // For regex, don't clean (preserve regex syntax); for simple patterns, clean
+        let patternString = newPatternIsRegex ? newPattern.trimmingCharacters(in: .whitespaces) : cleanURLPattern(newPattern)
 
-        // Validate the cleaned pattern
-        if cleaned.isEmpty {
+        // Validate the pattern
+        if patternString.isEmpty {
             patternValidationError = "Please enter a URL pattern"
             return
         }
 
+        // For regex patterns, require manual domain entry
+        if newPatternIsRegex {
+            let cleanedDomain = cleanURLPattern(newPatternDomain)
+            if cleanedDomain.isEmpty {
+                patternValidationError = "Please enter the domain to block"
+                return
+            }
+        }
+
         // Check for duplicates
-        if urlPatterns.contains(where: { $0.pattern == cleaned }) {
+        if urlPatterns.contains(where: { $0.pattern == patternString }) {
             patternValidationError = "This pattern is already in the list"
             newPattern = ""
             return
         }
 
         // Validate pattern format (skip validation for regex patterns)
-        if !newPatternIsRegex, let validationError = validateURLPattern(cleaned) {
+        if !newPatternIsRegex, let validationError = validateURLPattern(patternString) {
             patternValidationError = validationError
             return
         }
 
-        let domain = extractDomain(from: cleaned)
+        // For regex, use manually entered domain; for simple patterns, extract from pattern
+        let domain = newPatternIsRegex ? cleanURLPattern(newPatternDomain) : extractDomain(from: patternString)
         let pattern = URLPattern(
-            pattern: cleaned,
+            pattern: patternString,
             isRegex: newPatternIsRegex,
             associatedDomain: domain,
             blockAction: newPatternBlockAction
@@ -269,6 +294,7 @@ struct TriggerDetailView: View {
         urlPatterns.append(pattern)
         newPattern = ""
         newPatternIsRegex = false
+        newPatternDomain = ""
         newPatternBlockAction = .blockDomain
         patternValidationError = nil
         saveIfValid()
