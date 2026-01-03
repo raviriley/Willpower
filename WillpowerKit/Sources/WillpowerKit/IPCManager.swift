@@ -8,8 +8,8 @@
 import Foundation
 
 /// Manages IPC between Willpower app and daemon
-/// Uses file-based IPC as primary (works without App Group provisioning)
-/// Falls back to App Groups UserDefaults if available
+/// Uses App Groups container for secure file-based IPC
+/// Falls back to UserDefaults if available
 public final class IPCManager: @unchecked Sendable {
 
     // MARK: - Constants
@@ -17,11 +17,28 @@ public final class IPCManager: @unchecked Sendable {
     /// App Group identifier - must match in both app and daemon entitlements
     public static let appGroupIdentifier = "group.P5AM8FWTFW.raviriley.Willpower"
 
-    /// File-based IPC directory (accessible by both sandboxed app and root daemon)
-    public static let ipcDirectory = "/tmp/willpower"
-    public static let stateFile = "/tmp/willpower/state.json"
-    public static let commandsFile = "/tmp/willpower/commands.json"
-    public static let heartbeatFile = "/tmp/willpower/heartbeat"
+    /// IPC subdirectory within App Groups container
+    private static let ipcSubdirectory = "ipc"
+
+    // MARK: - IPC Paths (Computed)
+
+    /// Base IPC directory - computed based on context (app vs daemon)
+    ///
+    /// NOTE: We use /Library/Application Support/Willpower for IPC because:
+    /// - App Groups containers have macOS macl (Mandatory Access Control Label) that blocks root access
+    /// - The daemon runs as root and cannot write to user's App Groups container
+    /// - Even with the App Groups entitlement, macl also checks UID (root != user)
+    /// - /Library/Application Support is accessible by both root and user processes
+    ///
+    /// TODO: Replace with XPC for more secure communication (XPC runs as user, not root)
+    public static var ipcDirectory: String {
+        // Use a system-wide location that both root (daemon) and user (app) can access
+        return "/Library/Application Support/Willpower/\(ipcSubdirectory)"
+    }
+
+    public static var stateFile: String { ipcDirectory + "/state.json" }
+    public static var commandsFile: String { ipcDirectory + "/commands.json" }
+    public static var heartbeatFile: String { ipcDirectory + "/heartbeat" }
 
     /// Keys for UserDefaults storage (fallback)
     private enum Keys {
@@ -62,12 +79,24 @@ public final class IPCManager: @unchecked Sendable {
         }
     }
 
-    /// Ensure the IPC directory exists
+    /// Ensure the IPC directory exists with appropriate permissions
+    /// Uses /Library/Application Support which both root and user can access
     private func ensureIPCDirectory() {
-        if !fileManager.fileExists(atPath: Self.ipcDirectory) {
-            try? fileManager.createDirectory(atPath: Self.ipcDirectory, withIntermediateDirectories: true)
-            // Make it world-readable/writable for IPC between user app and root daemon
-            try? fileManager.setAttributes([.posixPermissions: 0o777], ofItemAtPath: Self.ipcDirectory)
+        let path = Self.ipcDirectory
+
+        // Also ensure parent directory exists
+        let parentPath = "/Library/Application Support/Willpower"
+        if !fileManager.fileExists(atPath: parentPath) {
+            try? fileManager.createDirectory(atPath: parentPath, withIntermediateDirectories: true)
+            // 0o777 allows both daemon (root) and app (user) to read/write
+            try? fileManager.setAttributes([.posixPermissions: 0o777], ofItemAtPath: parentPath)
+        }
+
+        if !fileManager.fileExists(atPath: path) {
+            try? fileManager.createDirectory(atPath: path, withIntermediateDirectories: true)
+            // 0o777 allows both root (daemon) and user (app) to read/write
+            try? fileManager.setAttributes([.posixPermissions: 0o777], ofItemAtPath: path)
+            print("[IPCManager] Created IPC directory: \(path)")
         }
     }
 
@@ -81,6 +110,7 @@ public final class IPCManager: @unchecked Sendable {
         ensureIPCDirectory()
         let url = URL(fileURLWithPath: Self.stateFile)
         try data.write(to: url, options: .atomic)
+        // 0o666 allows both daemon (root) and app (user) to read/write
         try? fileManager.setAttributes([.posixPermissions: 0o666], ofItemAtPath: Self.stateFile)
 
         // Fallback: also save to UserDefaults if available
@@ -156,6 +186,7 @@ public final class IPCManager: @unchecked Sendable {
         ensureIPCDirectory()
         let url = URL(fileURLWithPath: Self.commandsFile)
         try data.write(to: url, options: .atomic)
+        // 0o666 allows both daemon (root) and app (user) to read/write
         try? fileManager.setAttributes([.posixPermissions: 0o666], ofItemAtPath: Self.commandsFile)
 
         // Also save to UserDefaults if available
@@ -217,6 +248,7 @@ public final class IPCManager: @unchecked Sendable {
         ensureIPCDirectory()
         let timestampString = String(timestamp)
         try? timestampString.write(toFile: Self.heartbeatFile, atomically: true, encoding: .utf8)
+        // 0o666 allows both daemon (root) and app (user) to read/write
         try? fileManager.setAttributes([.posixPermissions: 0o666], ofItemAtPath: Self.heartbeatFile)
 
         // Also update UserDefaults if available

@@ -3,20 +3,76 @@ import WillpowerKit
 
 // MARK: - Configuration
 
-private let daemonVersion = "1.0.0"
+private let daemonVersion = "1.0.1"
 private let runLoopInterval: TimeInterval = 5.0
 private let heartbeatInterval: TimeInterval = 5.0
 
+// MARK: - Stdout Flushing
+
+/// Swift buffers stdout when redirected to a file. Force flush after important messages.
+func log(_ message: String) {
+    print(message)
+    fflush(stdout)
+}
+
 // MARK: - Main Entry Point
 
-print("[WillpowerDaemon] Starting v\(daemonVersion)...")
-print("[WillpowerDaemon] PID: \(getpid()), UID: \(getuid())")
+log("[WillpowerDaemon] Starting v\(daemonVersion)...")
+log("[WillpowerDaemon] PID: \(getpid()), UID: \(getuid())")
 
 // Check if running as root (required for /etc/hosts modification)
 if getuid() != 0 {
-    print("[WillpowerDaemon] WARNING: Not running as root (UID: \(getuid()))")
-    print("[WillpowerDaemon] /etc/hosts modification will fail without root privileges")
-    print("[WillpowerDaemon] Run with sudo or install as LaunchDaemon")
+    log("[WillpowerDaemon] WARNING: Not running as root (UID: \(getuid()))")
+    log("[WillpowerDaemon] /etc/hosts modification will fail without root privileges")
+    log("[WillpowerDaemon] Run with sudo or install as LaunchDaemon")
+}
+
+// MARK: - IPC Setup
+
+// Log the IPC directory being used
+// Using /Library/Application Support/Willpower/ipc - accessible by both root and user
+log("[WillpowerDaemon] IPC directory: \(IPCManager.ipcDirectory)")
+
+let fm = FileManager.default
+
+// Ensure IPC directory exists with proper permissions
+// Using /Library/Application Support/Willpower/ipc which is accessible by both root and user
+let ipcDir = IPCManager.ipcDirectory
+let parentDir = "/Library/Application Support/Willpower"
+
+if !fm.fileExists(atPath: parentDir) {
+    do {
+        try fm.createDirectory(atPath: parentDir, withIntermediateDirectories: true)
+        // 0o777 allows both daemon (root) and app (user) to read/write
+        try fm.setAttributes([.posixPermissions: 0o777], ofItemAtPath: parentDir)
+        log("[WillpowerDaemon] Created parent directory: \(parentDir)")
+    } catch {
+        print("[WillpowerDaemon] Failed to create parent directory: \(error)")
+    }
+}
+
+if !fm.fileExists(atPath: ipcDir) {
+    do {
+        try fm.createDirectory(atPath: ipcDir, withIntermediateDirectories: true)
+        // 0o777 allows both daemon (root) and app (user) to read/write
+        try fm.setAttributes([.posixPermissions: 0o777], ofItemAtPath: ipcDir)
+        log("[WillpowerDaemon] Created IPC directory: \(ipcDir)")
+    } catch {
+        print("[WillpowerDaemon] Failed to create IPC directory: \(error)")
+    }
+}
+
+// Migrate data from old /tmp/willpower location if needed
+let oldIPCDir = "/tmp/willpower"
+if fm.fileExists(atPath: "\(oldIPCDir)/state.json") && !fm.fileExists(atPath: IPCManager.stateFile) {
+    log("[WillpowerDaemon] Migrating data from \(oldIPCDir)...")
+    do {
+        try fm.copyItem(atPath: "\(oldIPCDir)/state.json", toPath: IPCManager.stateFile)
+        try? fm.setAttributes([.posixPermissions: 0o666], ofItemAtPath: IPCManager.stateFile)
+        log("[WillpowerDaemon] ✓ Migrated state.json")
+    } catch {
+        print("[WillpowerDaemon] Migration failed: \(error)")
+    }
 }
 
 // Initialize components
@@ -44,11 +100,11 @@ guard ipcManager.isAvailable else {
 // Load initial state or create default
 var state = ipcManager.loadStateOrDefault()
 state.daemonVersion = daemonVersion
-print("[WillpowerDaemon] Loaded state: \(state.blocklists.count) blocklists, \(state.activeBlocks.count) active blocks")
+log("[WillpowerDaemon] Loaded state: \(state.blocklists.count) blocklists, \(state.activeBlocks.count) active blocks")
 
 // Start async operations
 Task {
-    print("[WillpowerDaemon] Initialized. Entering run loop...")
+    log("[WillpowerDaemon] Initialized. Entering run loop...")
 
     // Main run loop
     var lastHeartbeat = Date()
@@ -542,7 +598,7 @@ func applyBlocks(
         return  // No change, skip updates
     }
 
-    print("[WillpowerDaemon] Block state changed. Now blocking \(allDomains.count) domain(s)")
+    log("[WillpowerDaemon] Block state changed. Now blocking \(allDomains.count) domain(s)")
 
     // LAYER 1: Hosts file blocking
     do {
