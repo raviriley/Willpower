@@ -356,6 +356,7 @@ struct BlocklistDetailView: View {
                                 .foregroundStyle(.orange)
                         } else {
                             Text("You can paste URLs and they will be cleaned automatically.")
+                                .foregroundStyle(.secondary)
                         }
                     }
 
