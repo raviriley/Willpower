@@ -21,10 +21,6 @@ struct TriggerListView: View {
                 TriggerRowView(trigger: trigger, viewModel: viewModel)
                     .tag(trigger.id)
                     .contextMenu {
-                        Button("Reset Visit Count") {
-                            let patternIds = trigger.urlPatterns.map { $0.id }
-                            viewModel.resetVisitCounts(patternIds: patternIds)
-                        }
                         Button(trigger.isEnabled ? "Disable" : "Enable") {
                             var updated = trigger
                             updated.isEnabled.toggle()

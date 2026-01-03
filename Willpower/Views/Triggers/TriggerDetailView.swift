@@ -82,12 +82,6 @@ struct TriggerDetailView: View {
                             }
                             .padding(.vertical, 4)
                         }
-
-                        Button("Reset Visit Count") {
-                            let patternIds = trigger.urlPatterns.map { $0.id }
-                            viewModel.resetVisitCounts(patternIds: patternIds)
-                        }
-                        .disabled(!viewModel.isDaemonRunning)
                     }
 
                     // Trigger Settings
