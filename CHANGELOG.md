@@ -293,7 +293,7 @@ Reasons:
 4. Simpler maintenance than SMJobBless
 5. Future-proof (SMJobBless is deprecated)
 
-The "toggle in System Settings" UX is actually beneficial for tamper resistance - it's harder to find than killing a process, and the daemon stays protected.
+The "toggle in System Settings" UX is less beneficial for tamper resistance - it's easier to find than killing a process. But that's a trade-off we are willing to make for the sake of simplicity.
 
 **Implementation:**
 - [ ] **Migrate to SMAppService.daemon**:
