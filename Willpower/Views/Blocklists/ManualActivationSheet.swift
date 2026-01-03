@@ -16,7 +16,6 @@ struct ManualActivationSheet: View {
 
     @State private var durationMinutes: Double = 60
     @State private var isLocked: Bool = true
-    @State private var showingConfirmation: Bool = false
 
     /// Get the current blocklist from viewModel (always fresh)
     var blocklist: BlocklistConfig? {
@@ -122,7 +121,7 @@ struct ManualActivationSheet: View {
                             Text("Lock Block")
                                 .font(.headline)
                         }
-                        Text("Cannot be disabled until time expires")
+                        Text(isLocked ? "Cannot be disabled until time expires" : "Can be disabled at any time")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -148,11 +147,7 @@ struct ManualActivationSheet: View {
                 .buttonStyle(.bordered)
 
                 Button("Start Block") {
-                    if isLocked {
-                        showingConfirmation = true
-                    } else {
-                        activateAndDismiss()
-                    }
+                    activateAndDismiss()
                 }
                 .keyboardShortcut(.return)
                 .buttonStyle(.borderedProminent)
@@ -160,18 +155,6 @@ struct ManualActivationSheet: View {
             }
         }
         .padding(24)
-        .confirmationDialog(
-            "Start Locked Block?",
-            isPresented: $showingConfirmation,
-            titleVisibility: .visible
-        ) {
-            Button("Start \(formattedDuration) Block", role: .destructive) {
-                activateAndDismiss()
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This block cannot be cancelled until it expires. \(blocklist.domains.count) domain(s) will be blocked for \(formattedDuration).")
-        }
     }
 
     private func presetLabel(for minutes: Int) -> String {
