@@ -205,25 +205,6 @@ public actor BrowserMonitor {
         }
     }
 
-    /// Reset visit counts
-    public func resetVisitCounts(patternIds: [UUID]? = nil) {
-        if let patternIds {
-            for id in patternIds {
-                if var record = visitRecords[id] {
-                    record.reset()
-                    visitRecords[id] = record
-                }
-                lastVisitTimes[id] = nil
-            }
-        } else {
-            for (id, var record) in visitRecords {
-                record.reset()
-                visitRecords[id] = record
-            }
-            lastVisitTimes.removeAll()
-        }
-    }
-
     // MARK: - Monitoring Control
 
     /// Start monitoring browsers

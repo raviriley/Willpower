@@ -445,8 +445,6 @@ public enum DaemonCommand: Codable, Sendable {
     case deleteIndependentTrigger(triggerId: UUID)
     /// Force state sync
     case forceSync
-    /// Reset visit counts (nil = reset all)
-    case resetVisitCounts(patternIds: [UUID]?)
     /// Report a URL visit from the app (app runs BrowserMonitor since it has user session)
     case reportVisit(patternId: UUID, url: String)
 }

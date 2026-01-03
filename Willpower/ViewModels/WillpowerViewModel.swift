@@ -509,22 +509,6 @@ final class WillpowerViewModel {
         }
     }
 
-    /// Reset visit counts
-    func resetVisitCounts(patternIds: [UUID]? = nil) {
-        guard isDaemonRunning else {
-            errorMessage = "Cannot reset visit counts: Daemon is not running"
-            return
-        }
-
-        do {
-            try ipcManager.resetVisitCounts(patternIds: patternIds)
-            // Force immediate state sync to reflect reset
-            syncState()
-        } catch {
-            errorMessage = "Failed to reset visit counts: \(error.localizedDescription)"
-        }
-    }
-
     // MARK: - Computed Properties
 
     /// Get currently selected blocklist

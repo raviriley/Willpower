@@ -174,13 +174,13 @@ TODOs are organized into two phases:
   - Make configurable in daemon plist
 
 #### Onboarding Flow
-- [ ] **First-launch onboarding** - Guide user through setup:
+- [x] **First-launch onboarding** - **IMPLEMENTED**:
   - Step 1: Welcome screen explaining what Willpower does
   - Step 2: Daemon installation (SMAppService approval in System Settings)
-  - Step 3: Create first blocklist (guided)
-  - **NO "Later" buttons** - each step must be completed or explicitly declined with consequences shown
-  - Store onboarding completion state in UserDefaults
-  - Note: Automation permission (for browser monitoring) is prompted automatically by macOS on first use
+  - Step 3: "Let's Go!" navigates to blocklists and opens create sheet
+  - No "Later" buttons - must complete each step
+  - Returning users with disabled daemon see only Step 2
+  - State stored in UserDefaults
 
 - [ ] **Permission status dashboard** - Show in Settings:
   - Daemon: Installed / Not Installed
@@ -230,10 +230,10 @@ TODOs are organized into two phases:
 ### 1.3 Core Feature Completion
 
 #### Schedule Improvements
-- [ ] **Overnight schedule windows** - Fix schedules spanning midnight:
-  - e.g., 22:00 - 06:00 should work correctly
-  - Test edge cases around midnight
-  - Update TriggerEvaluator logic
+- [x] **Overnight schedule windows** - **FIXED**: Schedules spanning midnight now work:
+  - TriggerEvaluator checks both "evening portion" (today) and "morning portion" (yesterday's overnight)
+  - e.g., Thursday 22:00-05:00 correctly activates Friday morning
+  - Also fixed: UI now shows per-schedule active status (not per-blocklist)
 
 - [ ] **Schedule conflict detection** - Warn if schedules overlap:
   - Same blocklist, overlapping times

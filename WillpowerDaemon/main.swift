@@ -187,20 +187,6 @@ func processCommands(
         case .forceSync:
             mutableState.lastUpdated = Date()
 
-        case .resetVisitCounts(let patternIds):
-            // Reset visit counts in state
-            if let ids = patternIds {
-                for id in ids {
-                    if let idx = mutableState.visitRecords.firstIndex(where: { $0.patternId == id }) {
-                        mutableState.visitRecords[idx].reset()
-                    }
-                }
-            } else {
-                for idx in mutableState.visitRecords.indices {
-                    mutableState.visitRecords[idx].reset()
-                }
-            }
-
         case .reportVisit(let patternId, let url):
             // Visit reported from app (which runs BrowserMonitor)
             if let idx = mutableState.visitRecords.firstIndex(where: { $0.patternId == patternId }) {
