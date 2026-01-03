@@ -3,7 +3,7 @@ import WillpowerKit
 
 // MARK: - Configuration
 
-private let daemonVersion = "1.0.1"
+private let daemonVersion = "1.0.2"  // Added tighter permissions
 private let runLoopInterval: TimeInterval = 5.0
 private let heartbeatInterval: TimeInterval = 5.0
 
@@ -40,11 +40,14 @@ let fm = FileManager.default
 let ipcDir = IPCManager.ipcDirectory
 let parentDir = "/Library/Application Support/Willpower"
 
+// Admin group ID for file ownership
+let adminGroupID: UInt32 = 80  // 'admin' group on macOS
+
 if !fm.fileExists(atPath: parentDir) {
     do {
         try fm.createDirectory(atPath: parentDir, withIntermediateDirectories: true)
-        // 0o777 allows both daemon (root) and app (user) to read/write
-        try fm.setAttributes([.posixPermissions: 0o777], ofItemAtPath: parentDir)
+        // 0o750: owner (root) rwx, group (admin) r-x, others ---
+        try fm.setAttributes([.posixPermissions: 0o750, .groupOwnerAccountID: adminGroupID], ofItemAtPath: parentDir)
         log("[WillpowerDaemon] Created parent directory: \(parentDir)")
     } catch {
         print("[WillpowerDaemon] Failed to create parent directory: \(error)")
@@ -54,31 +57,18 @@ if !fm.fileExists(atPath: parentDir) {
 if !fm.fileExists(atPath: ipcDir) {
     do {
         try fm.createDirectory(atPath: ipcDir, withIntermediateDirectories: true)
-        // 0o777 allows both daemon (root) and app (user) to read/write
-        try fm.setAttributes([.posixPermissions: 0o777], ofItemAtPath: ipcDir)
+        // 0o770: owner (root) rwx, group (admin) rwx, others ---
+        try fm.setAttributes([.posixPermissions: 0o770, .groupOwnerAccountID: adminGroupID], ofItemAtPath: ipcDir)
         log("[WillpowerDaemon] Created IPC directory: \(ipcDir)")
     } catch {
         print("[WillpowerDaemon] Failed to create IPC directory: \(error)")
     }
 }
 
-// Migrate data from old /tmp/willpower location if needed
-let oldIPCDir = "/tmp/willpower"
-if fm.fileExists(atPath: "\(oldIPCDir)/state.json") && !fm.fileExists(atPath: IPCManager.stateFile) {
-    log("[WillpowerDaemon] Migrating data from \(oldIPCDir)...")
-    do {
-        try fm.copyItem(atPath: "\(oldIPCDir)/state.json", toPath: IPCManager.stateFile)
-        try? fm.setAttributes([.posixPermissions: 0o666], ofItemAtPath: IPCManager.stateFile)
-        log("[WillpowerDaemon] ✓ Migrated state.json")
-    } catch {
-        print("[WillpowerDaemon] Migration failed: \(error)")
-    }
-}
-
 // Initialize components
 let hostsManager = HostsManager()
 let packetFilterManager = PacketFilterManager()
-let ipcManager = IPCManager()
+let ipcManager = IPCManager(role: .daemon)  // Use daemon role for tighter permissions
 let triggerEvaluator = TriggerEvaluator()
 
 /// Track previous blocked domains to detect changes (must be before dispatchMain)

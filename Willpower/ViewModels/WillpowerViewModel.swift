@@ -99,7 +99,7 @@ final class WillpowerViewModel {
 
     // MARK: - Initialization
 
-    init(ipcManager: IPCManager = IPCManager()) {
+    init(ipcManager: IPCManager = IPCManager(role: .app)) {
         self.ipcManager = ipcManager
         self.browserMonitor = BrowserMonitor()
         self.isIPCAvailable = ipcManager.isAvailable

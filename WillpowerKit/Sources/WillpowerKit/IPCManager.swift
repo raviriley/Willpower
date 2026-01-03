@@ -7,8 +7,16 @@
 
 import Foundation
 
+// MARK: - Role Enum
+
+/// Role identifier for IPC participants
+public enum IPCRole: String, Sendable {
+    case app
+    case daemon
+}
+
 /// Manages IPC between Willpower app and daemon
-/// Uses App Groups container for secure file-based IPC
+/// Uses file-based IPC with tighter permissions (admin group only)
 /// Falls back to UserDefaults if available
 public final class IPCManager: @unchecked Sendable {
 
@@ -20,6 +28,9 @@ public final class IPCManager: @unchecked Sendable {
     /// IPC subdirectory within App Groups container
     private static let ipcSubdirectory = "ipc"
 
+    /// Admin group ID for file ownership (used by daemon)
+    private static let adminGroupID: UInt32 = 80  // 'admin' group on macOS
+
     // MARK: - IPC Paths (Computed)
 
     /// Base IPC directory - computed based on context (app vs daemon)
@@ -30,7 +41,8 @@ public final class IPCManager: @unchecked Sendable {
     /// - Even with the App Groups entitlement, macl also checks UID (root != user)
     /// - /Library/Application Support is accessible by both root and user processes
     ///
-    /// TODO: Replace with XPC for more secure communication (XPC runs as user, not root)
+    /// Security: Files are restricted to root:admin group with 0o640/0o660 permissions
+    /// TODO: Replace with XPC for more secure communication
     public static var ipcDirectory: String {
         // Use a system-wide location that both root (daemon) and user (app) can access
         return "/Library/Application Support/Willpower/\(ipcSubdirectory)"
@@ -54,6 +66,7 @@ public final class IPCManager: @unchecked Sendable {
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
     private let fileManager = FileManager.default
+    private let role: IPCRole
 
     /// Whether App Groups access is available
     public var isAvailable: Bool {
@@ -62,7 +75,10 @@ public final class IPCManager: @unchecked Sendable {
 
     // MARK: - Initialization
 
-    public init() {
+    /// Initialize IPCManager with specified role
+    /// - Parameter role: The role of this process (.app or .daemon)
+    public init(role: IPCRole = .app) {
+        self.role = role
         self.defaults = UserDefaults(suiteName: Self.appGroupIdentifier)
         self.encoder = JSONEncoder()
         self.decoder = JSONDecoder()
@@ -81,6 +97,7 @@ public final class IPCManager: @unchecked Sendable {
 
     /// Ensure the IPC directory exists with appropriate permissions
     /// Uses /Library/Application Support which both root and user can access
+    /// Permissions: root:admin ownership, 0o750 (parent) / 0o770 (ipc dir)
     private func ensureIPCDirectory() {
         let path = Self.ipcDirectory
 
@@ -88,14 +105,23 @@ public final class IPCManager: @unchecked Sendable {
         let parentPath = "/Library/Application Support/Willpower"
         if !fileManager.fileExists(atPath: parentPath) {
             try? fileManager.createDirectory(atPath: parentPath, withIntermediateDirectories: true)
-            // 0o777 allows both daemon (root) and app (user) to read/write
-            try? fileManager.setAttributes([.posixPermissions: 0o777], ofItemAtPath: parentPath)
+            // 0o750: owner (root) rwx, group (admin) r-x, others ---
+            try? fileManager.setAttributes([.posixPermissions: 0o750], ofItemAtPath: parentPath)
+            // Set group to admin if we're running as daemon (root)
+            if role == .daemon {
+                try? fileManager.setAttributes([.groupOwnerAccountID: Self.adminGroupID], ofItemAtPath: parentPath)
+            }
         }
 
         if !fileManager.fileExists(atPath: path) {
             try? fileManager.createDirectory(atPath: path, withIntermediateDirectories: true)
-            // 0o777 allows both root (daemon) and user (app) to read/write
-            try? fileManager.setAttributes([.posixPermissions: 0o777], ofItemAtPath: path)
+            // 0o770: owner (root) rwx, group (admin) rwx, others ---
+            // Group needs write for app to create/modify commands.json
+            try? fileManager.setAttributes([.posixPermissions: 0o770], ofItemAtPath: path)
+            // Set group to admin if we're running as daemon (root)
+            if role == .daemon {
+                try? fileManager.setAttributes([.groupOwnerAccountID: Self.adminGroupID], ofItemAtPath: path)
+            }
             print("[IPCManager] Created IPC directory: \(path)")
         }
     }
@@ -110,8 +136,12 @@ public final class IPCManager: @unchecked Sendable {
         ensureIPCDirectory()
         let url = URL(fileURLWithPath: Self.stateFile)
         try data.write(to: url, options: .atomic)
-        // 0o666 allows both daemon (root) and app (user) to read/write
-        try? fileManager.setAttributes([.posixPermissions: 0o666], ofItemAtPath: Self.stateFile)
+        // 0o640: owner (root) rw-, group (admin) r--, others ---
+        // Daemon writes, app (in admin group) reads
+        try? fileManager.setAttributes([.posixPermissions: 0o640], ofItemAtPath: Self.stateFile)
+        if role == .daemon {
+            try? fileManager.setAttributes([.groupOwnerAccountID: Self.adminGroupID], ofItemAtPath: Self.stateFile)
+        }
 
         // Fallback: also save to UserDefaults if available
         defaults?.set(data, forKey: Keys.state)
@@ -186,8 +216,12 @@ public final class IPCManager: @unchecked Sendable {
         ensureIPCDirectory()
         let url = URL(fileURLWithPath: Self.commandsFile)
         try data.write(to: url, options: .atomic)
-        // 0o666 allows both daemon (root) and app (user) to read/write
-        try? fileManager.setAttributes([.posixPermissions: 0o666], ofItemAtPath: Self.commandsFile)
+        // 0o660: owner (root) rw-, group (admin) rw-, others ---
+        // Both daemon and app (in admin group) need read/write
+        try? fileManager.setAttributes([.posixPermissions: 0o660], ofItemAtPath: Self.commandsFile)
+        if role == .daemon {
+            try? fileManager.setAttributes([.groupOwnerAccountID: Self.adminGroupID], ofItemAtPath: Self.commandsFile)
+        }
 
         // Also save to UserDefaults if available
         defaults?.set(data, forKey: Keys.commands)
@@ -233,6 +267,11 @@ public final class IPCManager: @unchecked Sendable {
             let data = try encoder.encode(commands)
             let url = URL(fileURLWithPath: Self.commandsFile)
             try data.write(to: url, options: .atomic)
+            // 0o660 permissions
+            try? fileManager.setAttributes([.posixPermissions: 0o660], ofItemAtPath: Self.commandsFile)
+            if role == .daemon {
+                try? fileManager.setAttributes([.groupOwnerAccountID: Self.adminGroupID], ofItemAtPath: Self.commandsFile)
+            }
             defaults?.set(data, forKey: Keys.commands)
         }
         defaults?.synchronize()
@@ -248,8 +287,12 @@ public final class IPCManager: @unchecked Sendable {
         ensureIPCDirectory()
         let timestampString = String(timestamp)
         try? timestampString.write(toFile: Self.heartbeatFile, atomically: true, encoding: .utf8)
-        // 0o666 allows both daemon (root) and app (user) to read/write
-        try? fileManager.setAttributes([.posixPermissions: 0o666], ofItemAtPath: Self.heartbeatFile)
+        // 0o640: owner (root) rw-, group (admin) r--, others ---
+        // Daemon writes, app (in admin group) reads
+        try? fileManager.setAttributes([.posixPermissions: 0o640], ofItemAtPath: Self.heartbeatFile)
+        if role == .daemon {
+            try? fileManager.setAttributes([.groupOwnerAccountID: Self.adminGroupID], ofItemAtPath: Self.heartbeatFile)
+        }
 
         // Also update UserDefaults if available
         defaults?.set(timestamp, forKey: Keys.daemonHeartbeat)
