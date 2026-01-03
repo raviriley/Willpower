@@ -90,88 +90,7 @@ struct TriggerDetailView: View {
                         .disabled(!viewModel.isDaemonRunning)
                     }
 
-                    // URL Patterns Section
-                    Section("URL Patterns to Monitor") {
-                        ForEach(urlPatterns) { pattern in
-                            VStack(alignment: .leading, spacing: 4) {
-                                HStack {
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(pattern.pattern)
-                                            .font(.system(.body, design: .monospaced))
-                                        HStack(spacing: 8) {
-                                            Text(pattern.isRegex ? "Regex" : "Contains")
-                                                .font(.caption2)
-                                                .padding(.horizontal, 6)
-                                                .padding(.vertical, 2)
-                                                .background(Color.secondary.opacity(0.2))
-                                                .clipShape(Capsule())
-                                            Text(blockActionDescription(for: pattern))
-                                                .font(.caption)
-                                                .foregroundStyle(.secondary)
-                                        }
-                                    }
-                                    Spacer()
-                                    Button(role: .destructive) {
-                                        urlPatterns.removeAll { $0.id == pattern.id }
-                                        saveIfValid()
-                                    } label: {
-                                        Image(systemName: "minus.circle.fill")
-                                            .foregroundStyle(.red)
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                            }
-                        }
-
-                        // Add new pattern
-                        VStack(alignment: .leading, spacing: 8) {
-                            TextField("youtube.com/shorts", text: $newPattern)
-                                .textFieldStyle(.roundedBorder)
-                                .font(.system(.body, design: .monospaced))
-                                .lineLimit(1)
-                                .truncationMode(.tail)
-                                .onSubmit { addPattern() }
-                                .onChange(of: newPattern) { _, _ in
-                                    patternValidationError = nil
-                                }
-
-                            if let error = patternValidationError {
-                                Text(error)
-                                    .font(.caption)
-                                    .foregroundStyle(.red)
-                            }
-
-                            HStack {
-                                Toggle("Use Regex", isOn: $newPatternIsRegex)
-                                    .toggleStyle(.checkbox)
-
-                                Spacer()
-                            }
-
-                            // Block Action Picker
-                            Picker("When triggered", selection: $newPatternBlockAction) {
-                                Text("Block domain").tag(BlockAction.blockDomain)
-                                ForEach(viewModel.blocklists) { blocklist in
-                                    Text("Activate: \(blocklist.name)").tag(BlockAction.activateBlocklist(blocklistId: blocklist.id))
-                                }
-                            }
-                            .pickerStyle(.menu)
-
-                            HStack {
-                                Spacer()
-                                Button {
-                                    addPattern()
-                                } label: {
-                                    Label("Add Pattern", systemImage: "plus.circle.fill")
-                                }
-                                .buttonStyle(.borderedProminent)
-                                .controlSize(.small)
-                                .disabled(newPattern.trimmingCharacters(in: .whitespaces).isEmpty)
-                            }
-                        }
-                    }
-
-                    // Threshold Settings
+                    // Trigger Settings
                     Section("Trigger Settings") {
                         Stepper("Max Visits: \(maxVisits)", value: $maxVisits, in: 1...100)
 
@@ -186,22 +105,78 @@ struct TriggerDetailView: View {
                         }
                     }
 
-                    Section {
+                    // URL Patterns Section
+                    Section("URL Patterns to Monitor") {
+                        ForEach(urlPatterns) { pattern in
+                            HStack(alignment: .top) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("When you visit a URL \(maxVisits) time\(maxVisits == 1 ? "" : "s") that \(pattern.isRegex ? "matches regex" : "contains"):")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                    Text(pattern.pattern)
+                                        .font(.system(.body, design: .monospaced))
+                                    Text(blockActionDescription(for: pattern))
+                                        .font(.callout)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Button(role: .destructive) {
+                                    urlPatterns.removeAll { $0.id == pattern.id }
+                                    saveIfValid()
+                                } label: {
+                                    Image(systemName: "minus.circle.fill")
+                                        .foregroundStyle(.red)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            .padding(.vertical, 2)
+                        }
+
+                        // Add new pattern
                         VStack(alignment: .leading, spacing: 8) {
-                            Label {
-                                Text("How it works")
-                                    .font(.headline)
-                            } icon: {
-                                Image(systemName: "info.circle")
+                            Text("Add URL Pattern")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                            
+                            HStack(spacing: 8) {
+                                Toggle(isOn: $newPatternIsRegex) {
+                                    Text("Use Regex")
+                                }
+                                .toggleStyle(.checkbox)
+                                .fixedSize()
+                                
+                                TextField("", text: $newPattern, prompt: Text("youtube.com/shorts").foregroundColor(.secondary))
+                                    .textFieldStyle(.roundedBorder)
+                                    .font(.system(.body, design: .monospaced))
+                                    .lineLimit(1)
+                                    .onSubmit { addPattern() }
+                                    .onChange(of: newPattern) { _, _ in
+                                        patternValidationError = nil
+                                    }
+                                
+                                Button {
+                                    addPattern()
+                                } label: {
+                                    Image(systemName: "plus.circle.fill")
+                                }
+                                .buttonStyle(.plain)
+                                .foregroundStyle(newPattern.trimmingCharacters(in: .whitespaces).isEmpty ? Color.secondary : Color.blue)
+                                .disabled(newPattern.trimmingCharacters(in: .whitespaces).isEmpty)
                             }
 
-                            Text("When you visit URLs matching these patterns \(maxVisits) time\(maxVisits == 1 ? "" : "s"), blocking will activate for \(formatDuration(blockDurationMinutes * 60)).")
-                                .font(.callout)
-                                .foregroundStyle(.secondary)
+                            if let error = patternValidationError {
+                                Text(error)
+                                    .font(.caption)
+                                    .foregroundStyle(.red)
+                            }
 
-                            Text("Each pattern independently blocks its domain or activates a blocklist.")
-                                .font(.callout)
-                                .foregroundStyle(.secondary)
+                            Picker("When triggered", selection: $newPatternBlockAction) {
+                                Text("Block domain").tag(BlockAction.blockDomain)
+                                ForEach(viewModel.blocklists) { blocklist in
+                                    Text("Activate: \(blocklist.name)").tag(BlockAction.activateBlocklist(blocklistId: blocklist.id))
+                                }
+                            }
+                            .pickerStyle(.menu)
                         }
                     }
 
@@ -328,14 +303,15 @@ struct TriggerDetailView: View {
     }
 
     private func blockActionDescription(for pattern: URLPattern) -> String {
+        let duration = formatDuration(blockDurationMinutes * 60)
         switch pattern.blockAction {
         case .blockDomain:
-            return "\u{2192} blocks \(pattern.associatedDomain)"
+            return "→ \(pattern.associatedDomain) is blocked for \(duration)"
         case .activateBlocklist(let blocklistId):
             if let blocklist = viewModel.blocklists.first(where: { $0.id == blocklistId }) {
-                return "\u{2192} activates \(blocklist.name) blocklist"
+                return "→ \(blocklist.name) blocklist is activated for \(duration)"
             }
-            return "\u{2192} activates blocklist"
+            return "→ blocklist is activated for \(duration)"
         }
     }
 
