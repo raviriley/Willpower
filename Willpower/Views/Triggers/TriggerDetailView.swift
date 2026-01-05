@@ -120,7 +120,7 @@ struct TriggerDetailView: View {
                                     saveIfValid()
                                 } label: {
                                     Image(systemName: "minus.circle.fill")
-                                        .foregroundStyle(.red)
+                                        .foregroundStyle(.red.opacity(0.8))
                                 }
                                 .buttonStyle(.plain)
                             }
