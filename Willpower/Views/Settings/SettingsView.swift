@@ -75,6 +75,8 @@ struct SettingsView: View {
                 }
             } header: {
                 Text("Preferences")
+            } footer: {
+                Text("Willpower runs in the menu bar to monitor browser visits. Click the shield icon to open the main window.")
             }
 
             // MARK: - Data Section
