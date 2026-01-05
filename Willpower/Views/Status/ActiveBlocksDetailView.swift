@@ -123,11 +123,6 @@ struct ActiveBlockCard: View {
                 Spacer()
 
                 VStack(alignment: .trailing, spacing: 4) {
-                    StatusBadge(
-                        text: isLocked ? "LOCKED" : "ACTIVE",
-                        color: isLocked ? .red : .orange
-                    )
-
                     if let expiresAt {
                         HStack(spacing: 4) {
                             Image(systemName: "clock")
@@ -140,6 +135,11 @@ struct ActiveBlockCard: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
+
+                    StatusBadge(
+                        text: isLocked ? "LOCKED" : "ACTIVE",
+                        color: isLocked ? .red : .orange
+                    )
                 }
             }
 
