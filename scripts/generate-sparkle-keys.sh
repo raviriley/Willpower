@@ -4,20 +4,23 @@
 #
 # Usage: ./scripts/generate-sparkle-keys.sh
 #
-# This script generates EdDSA (Ed25519) keys used by Sparkle to verify
-# that updates are authentically signed by you.
+# This script uses Sparkle's generate_keys tool to create EdDSA (Ed25519) keys
+# for signing app updates. The private key is stored securely in macOS Keychain.
 #
 # IMPORTANT:
-#   - The PRIVATE key must be kept SECRET and secure
+#   - The PRIVATE key is stored in your macOS Keychain
 #   - The PUBLIC key goes in your app's Info.plist (SUPublicEDKey)
-#   - Back up your private key - you cannot regenerate it!
-#   - If you lose the private key, existing users cannot update
+#   - Back up your Keychain - you cannot regenerate the private key!
+#   - If you lose the private key, existing users cannot verify updates
+#
+# Prerequisites:
+#   - Sparkle added to your Xcode project (via SPM or manually)
+#   - Build the project once so Sparkle tools are available
 #
 
 set -e
 
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-KEYS_DIR="$PROJECT_DIR/.sparkle-keys"
 
 # Colors
 RED='\033[0;31m'
@@ -44,22 +47,7 @@ echo -e "${BLUE}  Sparkle EdDSA Key Generator${NC}"
 echo -e "${BLUE}════════════════════════════════════════════════════════════${NC}"
 echo ""
 
-# Check if keys already exist
-if [ -f "$KEYS_DIR/eddsa_private.key" ]; then
-    log_warn "Keys already exist in $KEYS_DIR"
-    log_warn "To regenerate, delete the .sparkle-keys folder first"
-    echo ""
-    echo "Existing public key (for Info.plist SUPublicEDKey):"
-    echo ""
-    cat "$KEYS_DIR/eddsa_public.key"
-    echo ""
-    exit 0
-fi
-
-# Create keys directory
-mkdir -p "$KEYS_DIR"
-
-# Method 1: Try using Sparkle's generate_keys if available
+# Find Sparkle's generate_keys tool
 SPARKLE_GENERATE_KEYS=""
 
 # Check common locations for Sparkle's generate_keys
@@ -77,88 +65,39 @@ for pattern in "${POSSIBLE_PATHS[@]}"; do
     fi
 done
 
-if [ -n "$SPARKLE_GENERATE_KEYS" ]; then
-    log_info "Found Sparkle generate_keys: $SPARKLE_GENERATE_KEYS"
-    log_info "Generating keys using Sparkle's tool..."
-
-    # Sparkle's generate_keys outputs to stdout
-    # It stores the private key in Keychain and prints the public key
-    KEY_OUTPUT=$("$SPARKLE_GENERATE_KEYS" 2>&1)
-
-    # Extract public key from output (handles both new key and existing key messages)
-    # Look for the base64 key in <string>...</string> tags
-    PUBLIC_KEY=$(echo "$KEY_OUTPUT" | grep -o '<string>[^<]*</string>' | sed 's/<string>//;s/<\/string>//' | tr -d '[:space:]')
-
-    if [ -n "$PUBLIC_KEY" ]; then
-        # Save public key to file for reference
-        mkdir -p "$KEYS_DIR"
-        echo "$PUBLIC_KEY" > "$KEYS_DIR/eddsa_public.key"
-
-        log_info "Keys generated successfully!"
-        log_warn "IMPORTANT: The private key is stored in your macOS Keychain"
-        log_warn "  Service: https://sparkle-project.org"
-        log_warn "  Account: ed25519"
-        echo ""
-        log_info "To back up your private key, export your login keychain"
-    else
-        log_error "Could not extract public key from generate_keys output"
-        echo ""
-        echo "Output was:"
-        echo "$KEY_OUTPUT"
-        exit 1
-    fi
-
-else
-    log_warn "Sparkle's generate_keys not found"
-    log_info "Generating keys using OpenSSL..."
-
-    # Generate Ed25519 key pair using OpenSSL
-    # Note: This requires OpenSSL 1.1.1+ for Ed25519 support
-
-    if ! openssl version | grep -qE "OpenSSL (1\.1\.[1-9]|[3-9]\.)"; then
-        log_warn "OpenSSL 1.1.1+ required for Ed25519. Checking for alternative..."
-
-        # Try LibreSSL (macOS default)
-        if openssl genpkey -algorithm ED25519 -out /dev/null 2>/dev/null; then
-            log_info "Using system OpenSSL/LibreSSL"
-        else
-            log_error "Ed25519 not supported by your OpenSSL version"
-            log_error ""
-            log_error "Options:"
-            log_error "  1. Install OpenSSL 3.x: brew install openssl@3"
-            log_error "  2. Add Sparkle to Xcode first, then re-run this script"
-            log_error "     (Sparkle includes its own generate_keys tool)"
-            exit 1
-        fi
-    fi
-
-    # Generate private key
-    openssl genpkey -algorithm ED25519 -out "$KEYS_DIR/eddsa_private.pem"
-
-    # Extract public key in raw format and base64 encode
-    openssl pkey -in "$KEYS_DIR/eddsa_private.pem" -pubout -outform DER | \
-        tail -c 32 | base64 > "$KEYS_DIR/eddsa_public.key"
-
-    # Also save private key in base64 for Sparkle compatibility
-    openssl pkey -in "$KEYS_DIR/eddsa_private.pem" -outform DER | \
-        tail -c 64 | base64 > "$KEYS_DIR/eddsa_private.key"
-
-    log_info "Keys generated successfully!"
+if [ -z "$SPARKLE_GENERATE_KEYS" ]; then
+    log_error "Sparkle's generate_keys tool not found"
+    echo ""
+    echo "This tool is included with Sparkle. To use it:"
+    echo ""
+    echo "  1. Add Sparkle to your Xcode project:"
+    echo "     File → Add Package Dependencies → https://github.com/sparkle-project/Sparkle"
+    echo ""
+    echo "  2. Build the project once (Cmd+B)"
+    echo "     This downloads Sparkle and its tools"
+    echo ""
+    echo "  3. Run this script again"
+    echo ""
+    exit 1
 fi
 
-# Add to .gitignore
-GITIGNORE="$PROJECT_DIR/.gitignore"
-if [ -f "$GITIGNORE" ]; then
-    if ! grep -q ".sparkle-keys" "$GITIGNORE"; then
-        echo "" >> "$GITIGNORE"
-        echo "# Sparkle signing keys (KEEP PRIVATE!)" >> "$GITIGNORE"
-        echo ".sparkle-keys/" >> "$GITIGNORE"
-        log_info "Added .sparkle-keys to .gitignore"
-    fi
-else
-    echo "# Sparkle signing keys (KEEP PRIVATE!)" > "$GITIGNORE"
-    echo ".sparkle-keys/" >> "$GITIGNORE"
-    log_info "Created .gitignore with .sparkle-keys exclusion"
+log_info "Found Sparkle generate_keys: $SPARKLE_GENERATE_KEYS"
+log_info "Generating EdDSA signing key..."
+
+# Sparkle's generate_keys stores the private key in Keychain
+# and prints the public key to stdout
+KEY_OUTPUT=$("$SPARKLE_GENERATE_KEYS" 2>&1)
+
+# Extract public key from output
+# Look for the base64 key in <string>...</string> tags
+PUBLIC_KEY=$(echo "$KEY_OUTPUT" | grep -o '<string>[^<]*</string>' | sed 's/<string>//;s/<\/string>//' | tr -d '[:space:]')
+
+if [ -z "$PUBLIC_KEY" ]; then
+    log_error "Could not extract public key from generate_keys output"
+    echo ""
+    echo "Output was:"
+    echo "$KEY_OUTPUT"
+    exit 1
 fi
 
 echo ""
@@ -168,14 +107,18 @@ echo -e "${GREEN}═════════════════════
 echo ""
 echo "Public Key (add to Info.plist as SUPublicEDKey):"
 echo ""
-echo -e "${BLUE}$(cat "$KEYS_DIR/eddsa_public.key")${NC}"
+echo -e "${BLUE}$PUBLIC_KEY${NC}"
 echo ""
-echo -e "${YELLOW}CRITICAL: Back up your private key!${NC}"
-echo "  Location: $KEYS_DIR/"
+log_warn "IMPORTANT: The private key is stored in your macOS Keychain"
+echo "  Service: https://sparkle-project.org"
+echo "  Account: ed25519"
+echo ""
+log_warn "To back up your private key:"
+echo "  1. Open Keychain Access"
+echo "  2. Find 'Private key for signing Sparkle updates'"
+echo "  3. Export it to a secure location"
 echo ""
 echo "Next steps:"
 echo "  1. Copy the public key above"
 echo "  2. Paste it into Willpower/Info.plist as SUPublicEDKey value"
-echo "  3. Back up the .sparkle-keys folder to a secure location"
-echo "  4. NEVER commit .sparkle-keys to git"
 echo ""

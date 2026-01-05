@@ -6,13 +6,13 @@
 #
 # This script:
 #   1. Finds all DMG releases in the releases/ folder
-#   2. Signs them with your EdDSA private key
+#   2. Signs them with your EdDSA private key (from Keychain)
 #   3. Generates appcast.xml with update information
 #   4. Creates delta updates for faster downloads
 #
 # Prerequisites:
 #   - Sparkle added to project (for generate_appcast tool)
-#   - EdDSA keys generated (run generate-sparkle-keys.sh first)
+#   - EdDSA key in Keychain (run generate-sparkle-keys.sh first)
 #   - At least one release DMG in releases/ folder
 #
 
@@ -20,7 +20,6 @@ set -e
 
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 RELEASES_DIR="$PROJECT_DIR/releases"
-KEYS_DIR="$PROJECT_DIR/.sparkle-keys"
 OUTPUT_DIR="$PROJECT_DIR/build/appcast"
 
 # Colors
@@ -97,29 +96,27 @@ fi
 if [ -z "$GENERATE_APPCAST" ]; then
     log_error "Sparkle's generate_appcast tool not found"
     echo ""
-    echo "The generate_appcast tool is included with Sparkle."
+    echo "This tool is included with Sparkle. To use it:"
     echo ""
-    echo "Options:"
-    echo "  1. Build the project in Xcode first (with Sparkle dependency)"
-    echo "  2. Download Sparkle manually from https://sparkle-project.org"
-    echo "     and add bin/generate_appcast to your PATH"
-    echo ""
-    echo "After adding Sparkle to Xcode:"
-    echo "  - Build the project once"
-    echo "  - The tool will be in DerivedData"
+    echo "  1. Add Sparkle to your Xcode project (if not already done)"
+    echo "  2. Build the project once (Cmd+B)"
+    echo "  3. Run this script again"
     echo ""
     exit 1
 fi
 
 log_info "Using generate_appcast: $GENERATE_APPCAST"
 
-# Check for private key
-PRIVATE_KEY_PATH=""
-if [ -f "$KEYS_DIR/eddsa_private.key" ]; then
-    PRIVATE_KEY_PATH="$KEYS_DIR/eddsa_private.key"
-elif [ -f "$KEYS_DIR/eddsa_private.pem" ]; then
-    PRIVATE_KEY_PATH="$KEYS_DIR/eddsa_private.pem"
+# Check for EdDSA signing key in Keychain
+if ! security find-generic-password -s "https://sparkle-project.org" -a "ed25519" &>/dev/null; then
+    log_error "No EdDSA signing key found in Keychain"
+    echo ""
+    echo "Run ./scripts/generate-sparkle-keys.sh first to create a signing key."
+    echo ""
+    exit 1
 fi
+
+log_info "Found EdDSA signing key in Keychain"
 
 # Prepare output directory
 mkdir -p "$OUTPUT_DIR"
@@ -144,16 +141,8 @@ log_step "Generating appcast.xml..."
 
 GENERATE_ARGS=()
 
-# Add private key if available
-if [ -n "$PRIVATE_KEY_PATH" ]; then
-    log_info "Signing with EdDSA key"
-    # For Sparkle 2.x, the key is typically stored in Keychain
-    # We pass -s to use the Keychain or specify the key file
-    GENERATE_ARGS+=(-s "$PRIVATE_KEY_PATH")
-else
-    log_warn "No private key found - updates will not be signed!"
-    log_warn "Run ./scripts/generate-sparkle-keys.sh first"
-fi
+# Sparkle's generate_appcast automatically uses key from Keychain
+log_info "Signing with EdDSA key from Keychain"
 
 # Add download URL prefix if configured
 DOWNLOAD_URL_PREFIX="${SPARKLE_DOWNLOAD_URL:-}"
@@ -167,7 +156,7 @@ fi
     log_error "generate_appcast failed"
     log_error "This may happen if:"
     log_error "  - DMG files are not properly signed"
-    log_error "  - Private key format is incompatible"
+    log_error "  - App bundle is missing CFBundleVersion"
     echo ""
     log_info "Try running manually:"
     log_info "  $GENERATE_APPCAST $STAGING_DIR"
