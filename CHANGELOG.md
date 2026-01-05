@@ -428,12 +428,15 @@ The "toggle in System Settings" UX is less beneficial for tamper resistance - it
   - [ ] Schedule activation timing
   - [ ] Visit count threshold triggering
 
-- [x] **Logging framework** - **PARTIAL**:
+- [x] **Logging framework**:
   - [x] DaemonManager uses os_log with Logger class
-  - [ ] Replace print() with os_log in daemon (currently uses custom log() + print())
-  - [ ] Replace print() with os_log in WillpowerKit (IPCManager, HostsManager, etc.)
-  - [ ] Consistent log levels: debug, info, error
-  - [ ] Redact sensitive data (domains?)
+  - [x] Created unified WillpowerLogger in WillpowerKit with subsystems/categories
+  - [x] Created DaemonLogger for daemon with stdout fallback (for launchd capture)
+  - [x] Replace print() with os_log in daemon
+  - [x] Replace print() with os_log in WillpowerKit (IPCManager, HostsManager, PacketFilterManager, BrowserMonitor)
+  - [x] Replace print() with os_log in app (WillpowerViewModel, SettingsView)
+  - [x] Consistent log levels: debug, info, warning, error, fault
+  - [ ] Redact sensitive data (domains?) - not implemented, domains logged for debugging
 
 - [ ] **CI/CD pipeline**:
   - [ ] Automated builds
