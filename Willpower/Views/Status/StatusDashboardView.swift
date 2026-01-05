@@ -72,11 +72,6 @@ struct StatusDashboardView: View {
                         description: Text("All sites are currently accessible")
                     )
                 }
-
-                // Daemon Status
-                GroupBox("System Status") {
-                    DaemonStatusRow(viewModel: viewModel)
-                }
             }
             .padding()
         }
@@ -111,45 +106,6 @@ struct StatCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(color.opacity(0.1))
         .clipShape(RoundedRectangle(cornerRadius: 12))
-    }
-}
-
-// MARK: - Daemon Status Row
-
-struct DaemonStatusRow: View {
-    var viewModel: WillpowerViewModel
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Label("Daemon Status", systemImage: "server.rack")
-                Spacer()
-                DaemonStatusIndicator(isRunning: viewModel.isDaemonRunning)
-            }
-
-            if let lastHeartbeat = viewModel.lastDaemonHeartbeat {
-                HStack {
-                    Text("Last Heartbeat")
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Text(lastHeartbeat, style: .relative)
-                        .foregroundStyle(.secondary)
-                }
-                .font(.caption)
-            }
-
-            if let version = viewModel.daemonVersion {
-                HStack {
-                    Text("Version")
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Text(version)
-                        .foregroundStyle(.secondary)
-                }
-                .font(.caption)
-            }
-        }
-        .padding(.vertical, 4)
     }
 }
 
