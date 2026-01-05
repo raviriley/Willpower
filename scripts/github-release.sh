@@ -151,8 +151,10 @@ if [ -n "$SPARKLE_SIGN" ] && [ -x "$SPARKLE_SIGN" ]; then
     if [ -f "$APPCAST_PATH" ]; then
         SIGNATURE=$(echo "$SIGN_OUTPUT" | grep -o 'sparkle:edSignature="[^"]*"' | sed 's/sparkle:edSignature="//;s/"//')
         if [ -n "$SIGNATURE" ]; then
-            # Update the signature in appcast
-            sed -i '' "s/sparkle:edSignature=\"[^\"]*\"/sparkle:edSignature=\"$SIGNATURE\"/" "$APPCAST_PATH"
+            # Update the signature in appcast (use | delimiter to avoid issues with / in base64)
+            # Escape any | characters in the signature
+            ESCAPED_SIG=$(echo "$SIGNATURE" | sed 's/|/\\|/g')
+            sed -i '' "s|sparkle:edSignature=\"[^\"]*\"|sparkle:edSignature=\"$ESCAPED_SIG\"|" "$APPCAST_PATH"
         fi
     fi
 else

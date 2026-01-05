@@ -117,19 +117,61 @@ if [ -d "$APP_PATH/Contents/Frameworks" ]; then
         done
 
         # 3. Sign standalone executables/binaries in Versions/*/
-        # (like Sparkle's Autoupdate binary)
-        # Use file command to find Mach-O binaries, as -perm is unreliable
-        find "$framework/Versions" -type f ! -name ".*" ! -name "*.plist" ! -name "*.strings" ! -name "*.nib" ! -name "*.png" ! -name "*.tiff" ! -name "*.icns" ! -name "*.car" ! -name "*.lproj" 2>/dev/null | while read candidate; do
+        # Sparkle has specific binaries that need signing
+
+        # Explicitly sign known Sparkle binaries
+        FRAMEWORK_NAME=$(basename "$framework")
+        if [[ "$FRAMEWORK_NAME" == "Sparkle.framework" ]]; then
+            # Sign Autoupdate binary (critical for notarization)
+            for autoupdate in "$framework"/Versions/*/Autoupdate; do
+                if [ -f "$autoupdate" ]; then
+                    log_info "    Signing Sparkle binary: Autoupdate"
+                    codesign --force --timestamp --options runtime \
+                        --sign "$SIGNING_IDENTITY" \
+                        "$autoupdate"
+                fi
+            done
+
+            # Sign any other standalone binaries in Sparkle
+            for binary in "$framework"/Versions/*/fileop "$framework"/Versions/*/Updater; do
+                if [ -f "$binary" ]; then
+                    log_info "    Signing Sparkle binary: $(basename "$binary")"
+                    codesign --force --timestamp --options runtime \
+                        --sign "$SIGNING_IDENTITY" \
+                        "$binary"
+                fi
+            done
+        fi
+
+        # Generic: find and sign any other Mach-O executables
+        # Use for loop with glob to avoid subshell issues with while read
+        for candidate in "$framework"/Versions/*/* "$framework"/Versions/*/*/* ; do
+            # Skip if not a file
+            [ -f "$candidate" ] || continue
+
             # Skip if it's inside an .app or .xpc bundle (already signed)
-            if [[ "$candidate" == *".app/"* ]] || [[ "$candidate" == *".xpc/"* ]]; then
-                continue
-            fi
-            # Skip resource files and only sign Mach-O binaries
+            [[ "$candidate" == *".app/"* ]] && continue
+            [[ "$candidate" == *".xpc/"* ]] && continue
+
+            # Skip common non-binary files
+            [[ "$candidate" == *.plist ]] && continue
+            [[ "$candidate" == *.strings ]] && continue
+            [[ "$candidate" == *.nib ]] && continue
+            [[ "$candidate" == *.png ]] && continue
+            [[ "$candidate" == *.tiff ]] && continue
+            [[ "$candidate" == *.icns ]] && continue
+            [[ "$candidate" == *.car ]] && continue
+            [[ "$(basename "$candidate")" == .* ]] && continue
+
+            # Check if it's a Mach-O binary and not already signed in this run
             if file "$candidate" 2>/dev/null | grep -q "Mach-O"; then
-                log_info "    Signing binary: $(basename "$candidate")"
-                codesign --force --timestamp --options runtime \
-                    --sign "$SIGNING_IDENTITY" \
-                    "$candidate"
+                # Check if already signed by verifying signature
+                if ! codesign --verify "$candidate" 2>/dev/null; then
+                    log_info "    Signing binary: $(basename "$candidate")"
+                    codesign --force --timestamp --options runtime \
+                        --sign "$SIGNING_IDENTITY" \
+                        "$candidate"
+                fi
             fi
         done
 
