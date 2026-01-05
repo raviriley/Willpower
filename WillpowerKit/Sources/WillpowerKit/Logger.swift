@@ -37,25 +37,12 @@ public enum WillpowerLogger {
         case settings = "Settings"
     }
 
-    // MARK: - Logger Cache
+    // MARK: - Logger Factory
 
-    private static var loggers: [String: Logger] = [:]
-    private static let lock = NSLock()
-
-    /// Get or create a logger for the given subsystem and category
+    /// Create a logger for the given subsystem and category
+    /// Logger objects are lightweight so no caching needed
     public static func logger(subsystem: String, category: Category) -> Logger {
-        let key = "\(subsystem).\(category.rawValue)"
-
-        lock.lock()
-        defer { lock.unlock() }
-
-        if let existing = loggers[key] {
-            return existing
-        }
-
-        let logger = Logger(subsystem: subsystem, category: category.rawValue)
-        loggers[key] = logger
-        return logger
+        Logger(subsystem: subsystem, category: category.rawValue)
     }
 
     // MARK: - Convenience Loggers

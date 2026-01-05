@@ -224,7 +224,7 @@ public actor BrowserMonitor {
             }
         }
 
-        logger.info("Started monitoring with \(pollingInterval)s interval")
+        logger.info("Started monitoring with \(self.pollingInterval)s interval")
     }
 
     /// Stop monitoring

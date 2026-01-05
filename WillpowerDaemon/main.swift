@@ -106,10 +106,12 @@ Task {
             }
 
             // Process pending commands from app (includes visit reports)
-            state = try await processCommands(
+            // Returns updated state and whether configuration changed (blocklists/triggers)
+            let (updatedState, configChanged) = try await processCommands(
                 ipcManager: ipcManager,
                 state: state
             )
+            state = updatedState
 
             // Evaluate triggers and update blocks
             state = evaluateTriggers(
@@ -127,8 +129,8 @@ Task {
                 packetFilterManager: packetFilterManager
             )
 
-            // Save state
-            try ipcManager.saveState(state)
+            // Save state (backup only when config changed to preserve blocklist/trigger data)
+            try ipcManager.saveState(state, backupFirst: configChanged)
 
         } catch {
             log.error("Error in run loop: \(error)")
@@ -144,14 +146,18 @@ dispatchMain()
 
 // MARK: - Command Processing
 
+/// Process pending commands and return updated state with config change flag
+/// - Returns: Tuple of (updatedState, configurationChanged)
+///   configurationChanged is true when blocklists or triggers are modified (create/update/delete)
 func processCommands(
     ipcManager: IPCManager,
     state: WillpowerState
-) async throws -> WillpowerState {
+) async throws -> (WillpowerState, Bool) {
     var mutableState = state
+    var configChanged = false  // Track if blocklists/triggers changed
     let commands = try ipcManager.loadPendingCommands()
 
-    guard !commands.isEmpty else { return state }
+    guard !commands.isEmpty else { return (state, false) }
 
     log.info("Processing \(commands.count) command(s)")
 
@@ -193,6 +199,7 @@ func processCommands(
 
             mutableState.blocklists = blocklists
             mutableState.lastUpdated = Date()
+            configChanged = true  // Blocklists modified - backup needed
 
             // Clean up orphaned active blocks (blocks for deleted blocklists)
             // NOTE: Skip blocks from independent visit-count triggers - they use pattern.id as blocklistId
@@ -272,6 +279,7 @@ func processCommands(
             }
             mutableState.independentTriggers = triggers
             mutableState.lastUpdated = Date()
+            configChanged = true  // Triggers modified - backup needed
             log.info("Updated independent triggers: \(triggers.count) trigger(s)")
 
         case .deleteIndependentTrigger(let triggerId):
@@ -279,6 +287,7 @@ func processCommands(
             mutableState.independentTriggers.removeAll { $0.id == triggerId }
             if beforeCount > mutableState.independentTriggers.count {
                 log.info("Deleted independent trigger \(triggerId)")
+                configChanged = true  // Trigger deleted - backup needed
             }
             mutableState.lastUpdated = Date()
         }
@@ -286,7 +295,7 @@ func processCommands(
         try ipcManager.markCommandProcessed(wrapper.id)
     }
 
-    return mutableState
+    return (mutableState, configChanged)
 }
 
 // MARK: - Blocklist Activation

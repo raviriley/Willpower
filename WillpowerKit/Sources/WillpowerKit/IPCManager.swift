@@ -48,6 +48,7 @@ public final class IPCManager: @unchecked Sendable {
     }
 
     public static var stateFile: String { ipcDirectory + "/state.json" }
+    public static var stateBackupFile: String { ipcDirectory + "/state.json.backup" }
     public static var commandsFile: String { ipcDirectory + "/commands.json" }
     public static var heartbeatFile: String { ipcDirectory + "/heartbeat" }
 
@@ -115,10 +116,20 @@ public final class IPCManager: @unchecked Sendable {
     // MARK: - State Management
 
     /// Save the current Willpower state (typically called by daemon)
-    public func saveState(_ state: WillpowerState) throws {
+    /// - Parameters:
+    ///   - state: The state to save
+    ///   - backupFirst: If true, backs up current state before writing. Use for configuration changes
+    ///                  (blocklist/trigger create/update/delete) to ensure recovery is possible.
+    public func saveState(_ state: WillpowerState, backupFirst: Bool = false) throws {
         let data = try encoder.encode(state)
 
         ensureIPCDirectory()
+
+        // Only backup when configuration changes (not on every heartbeat/runtime update)
+        if backupFirst {
+            backupCurrentState()
+        }
+
         let url = URL(fileURLWithPath: Self.stateFile)
         try data.write(to: url, options: .atomic)
         // 0o640: owner (root) rw-, group (admin) r--, others ---
@@ -129,17 +140,81 @@ public final class IPCManager: @unchecked Sendable {
         }
     }
 
-    /// Load the current Willpower state
-    public func loadState() throws -> WillpowerState? {
-        let url = URL(fileURLWithPath: Self.stateFile)
-        if fileManager.fileExists(atPath: Self.stateFile),
-           let data = try? Data(contentsOf: url) {
-            return try decoder.decode(WillpowerState.self, from: data)
+    /// Backup current state.json to state.json.backup
+    /// Called before configuration changes to ensure blocklist/trigger configs are never lost
+    private func backupCurrentState() {
+        guard fileManager.fileExists(atPath: Self.stateFile) else { return }
+
+        do {
+            // Remove old backup if it exists
+            if fileManager.fileExists(atPath: Self.stateBackupFile) {
+                try fileManager.removeItem(atPath: Self.stateBackupFile)
+            }
+            // Copy current state to backup
+            try fileManager.copyItem(atPath: Self.stateFile, toPath: Self.stateBackupFile)
+            // Set same permissions on backup
+            try? fileManager.setAttributes([.posixPermissions: 0o640], ofItemAtPath: Self.stateBackupFile)
+            if role == .daemon {
+                try? fileManager.setAttributes([.groupOwnerAccountID: Self.adminGroupID], ofItemAtPath: Self.stateBackupFile)
+            }
+        } catch {
+            logger.warning("Failed to backup state: \(error.localizedDescription)")
         }
+    }
+
+    /// Load the current Willpower state
+    /// Falls back to backup file if main state file is corrupted
+    public func loadState() throws -> WillpowerState? {
+        // Try loading main state file
+        if let state = try? loadStateFromFile(Self.stateFile) {
+            return state
+        }
+
+        // Main file failed, try backup
+        if fileManager.fileExists(atPath: Self.stateBackupFile) {
+            logger.warning("Main state file corrupted or missing, attempting recovery from backup")
+            if let backupState = try? loadStateFromFile(Self.stateBackupFile) {
+                logger.info("Successfully recovered state from backup")
+                // Restore backup to main file
+                try? restoreFromBackup()
+                return backupState
+            }
+            logger.error("Backup file also corrupted, state recovery failed")
+        }
+
         return nil
     }
 
+    /// Load state from a specific file path
+    private func loadStateFromFile(_ path: String) throws -> WillpowerState? {
+        let url = URL(fileURLWithPath: path)
+        guard fileManager.fileExists(atPath: path),
+              let data = try? Data(contentsOf: url) else {
+            return nil
+        }
+        return try decoder.decode(WillpowerState.self, from: data)
+    }
+
+    /// Restore state.json from backup file
+    private func restoreFromBackup() throws {
+        guard fileManager.fileExists(atPath: Self.stateBackupFile) else { return }
+
+        // Remove corrupted main file
+        if fileManager.fileExists(atPath: Self.stateFile) {
+            try fileManager.removeItem(atPath: Self.stateFile)
+        }
+        // Copy backup to main
+        try fileManager.copyItem(atPath: Self.stateBackupFile, toPath: Self.stateFile)
+        // Set permissions
+        try? fileManager.setAttributes([.posixPermissions: 0o640], ofItemAtPath: Self.stateFile)
+        if role == .daemon {
+            try? fileManager.setAttributes([.groupOwnerAccountID: Self.adminGroupID], ofItemAtPath: Self.stateFile)
+        }
+        logger.info("Restored state.json from backup")
+    }
+
     /// Load state or return a default empty state
+    /// Attempts recovery from backup before falling back to default
     public func loadStateOrDefault() -> WillpowerState {
         do {
             return try loadState() ?? WillpowerState()
@@ -323,6 +398,7 @@ public final class IPCManager: @unchecked Sendable {
     /// Clear all IPC data (for testing/debugging only)
     public func clearAllData() {
         try? fileManager.removeItem(atPath: Self.stateFile)
+        try? fileManager.removeItem(atPath: Self.stateBackupFile)
         try? fileManager.removeItem(atPath: Self.commandsFile)
         try? fileManager.removeItem(atPath: Self.heartbeatFile)
     }
@@ -333,6 +409,7 @@ public final class IPCManager: @unchecked Sendable {
         lines.append("=== IPCManager Debug Info ===")
         lines.append("IPC Directory: \(Self.ipcDirectory)")
         lines.append("Available: \(isAvailable)")
+        lines.append("Backup exists: \(fileManager.fileExists(atPath: Self.stateBackupFile))")
 
         if let heartbeat = lastDaemonHeartbeat() {
             let formatter = DateFormatter()

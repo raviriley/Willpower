@@ -389,10 +389,10 @@ The "toggle in System Settings" UX is less beneficial for tamper resistance - it
   - [ ] App shows "Reconnecting..." during brief disconnect
   - [x] If persistent failure, show "Reinstall" prompt
 
-- [ ] **State backup/recovery**:
-  - [ ] Backup state.json before each write
-  - [ ] Recover from backup on parse failure
-  - [ ] Never lose blocklist configurations
+- [x] **State backup/recovery**:
+  - [x] Backup state.json before each write
+  - [x] Recover from backup on parse failure
+  - [x] Never lose blocklist configurations
 
 - [x] **Graceful degradation** - **PARTIAL**:
   - [x] App works for configuration even without daemon
@@ -436,7 +436,6 @@ The "toggle in System Settings" UX is less beneficial for tamper resistance - it
   - [x] Replace print() with os_log in WillpowerKit (IPCManager, HostsManager, PacketFilterManager, BrowserMonitor)
   - [x] Replace print() with os_log in app (WillpowerViewModel, SettingsView)
   - [x] Consistent log levels: debug, info, warning, error, fault
-  - [ ] Redact sensitive data (domains?) - not implemented, domains logged for debugging
 
 - [ ] **CI/CD pipeline**:
   - [ ] Automated builds
