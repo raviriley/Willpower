@@ -102,43 +102,6 @@ struct DetailView: View {
     }
 }
 
-struct ActiveBlocksDetailView: View {
-    var viewModel: WillpowerViewModel
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                ForEach(viewModel.activeBlocks) { block in
-                    GroupBox {
-                        VStack(alignment: .leading, spacing: 8) {
-                            if let blocklist = viewModel.blocklists.first(where: { $0.id == block.blocklistId }) {
-                                Text(blocklist.name)
-                                    .font(.headline)
-                            }
-
-                            Text("\(block.domains.count) domains blocked")
-                                .foregroundStyle(.secondary)
-
-                            if let expiresAt = block.expiresAt {
-                                HStack {
-                                    Text("Expires:")
-                                    TimeRemainingView(expiresAt: expiresAt)
-                                }
-                            }
-
-                            if block.isLocked {
-                                StatusBadge(text: "LOCKED", color: .red)
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                }
-            }
-            .padding()
-        }
-    }
-}
-
 #Preview {
     ContentView(viewModel: WillpowerViewModel())
         .environment(DaemonManager())
