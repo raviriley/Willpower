@@ -53,7 +53,7 @@ struct TriggerDetailView: View {
 
     var body: some View {
         Group {
-            if let trigger {
+            if trigger != nil {
                 Form {
                     // Trigger Name
                     Section("Trigger Name") {
