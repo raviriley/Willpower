@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Sparkle Configuration -->
+    <!-- URL where your appcast.xml is hosted -->
+    <key>SUFeedURL</key>
+    <string>https://github.com/raviriley/Willpower/releases/latest/download/appcast.xml</string>
+
+    <!-- EdDSA public key for update signature verification -->
+    <!-- Generate with: ./scripts/generate-sparkle-keys.sh -->
+    <key>SUPublicEDKey</key>
+    <string>Fw8aXCS8t9Yv4e5lP+qynsH0+EgYIkKMJlDDaFzbaDk=</string>
+
+    <!-- Automatically check for updates (user can disable in preferences) -->
+    <key>SUEnableAutomaticChecks</key>
+    <true/>
+
+    <!-- Allow users to check for updates manually -->
+    <key>SUAllowsAutomaticUpdates</key>
+    <true/>
+
+    <!-- Schedule: check for updates once per day -->
+    <key>SUScheduledCheckInterval</key>
+    <integer>86400</integer>
+
+    <!-- Apple Events for AppleScript automation (browser monitoring) -->
+    <key>NSAppleEventsUsageDescription</key>
+    <string>Willpower needs to monitor your browser tabs to track visits to specific websites. This enables visit-count triggers that automatically block distracting sites after too many visits.</string>
+</dict>
+</plist>

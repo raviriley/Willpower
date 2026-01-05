@@ -12,6 +12,7 @@ import WillpowerKit
 struct WillpowerApp: App {
     @State private var viewModel = WillpowerViewModel()
     @State private var daemonManager = DaemonManager()
+    @State private var updaterController = UpdaterController()
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @State private var showOnboarding = false
     @State private var showDaemonSetup = false
@@ -20,6 +21,7 @@ struct WillpowerApp: App {
         WindowGroup {
             ContentView(viewModel: viewModel)
                 .environment(daemonManager)
+                .environment(updaterController)
                 .onAppear {
                     viewModel.startStateSync()
                     daemonManager.refreshStatus()
@@ -58,5 +60,12 @@ struct WillpowerApp: App {
         }
         .windowStyle(.automatic)
         .defaultSize(width: 1000, height: 700)
+        .commands {
+            // Add "Check for Updates" to the app menu
+            CommandGroup(after: .appInfo) {
+                CheckForUpdatesView()
+                    .environment(updaterController)
+            }
+        }
     }
 }
