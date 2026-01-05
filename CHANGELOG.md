@@ -296,17 +296,19 @@ Reasons:
 The "toggle in System Settings" UX is less beneficial for tamper resistance - it's easier to find than killing a process. But that's a trade-off we are willing to make for the sake of simplicity.
 
 **Implementation:**
-- [ ] **Migrate to SMAppService.daemon**:
-  - Move daemon binary to `Contents/MacOS/` or `Contents/Library/LaunchServices/`
-  - Create launchd plist at `Contents/Library/LaunchDaemons/`
-  - Plist must include `BundleProgram`, `Label`, `MachServices`
-  - Register with `SMAppService.daemon(plistName:).register()`
-  - Guide user to System Settings > Login Items to approve
+- [x] **Migrate to SMAppService.daemon**:
+  - [x] Move daemon binary to `Contents/MacOS/` or `Contents/Library/LaunchServices/`
+  - [x] Create launchd plist at `Contents/Library/LaunchDaemons/`
+  - [ ] Plist must include `BundleProgram`, `Label`, `MachServices` - MachServices not yet added (needed for XPC)
+  - [x] Register with `SMAppService.daemon(plistName:).register()`
+  - [x] Guide user to System Settings > Login Items to approve
 
 - [ ] **XPC communication** - Replace file-based IPC:
-  - Define XPC protocol for commands/state
-  - Use `NSXPCConnection(machServiceName:)` for daemon communication
+  - [ ] Define XPC protocol for commands/state
+  - [ ] Use `NSXPCConnection(machServiceName:)` for daemon communication
+  - [ ] Add MachServices to launchd plist
   - More secure than file-based IPC
+  - Plan documented in TODO.md
 
 **References:**
 - [SMAppService API Overview](https://theevilbit.github.io/posts/smappservice/)
@@ -315,15 +317,15 @@ The "toggle in System Settings" UX is less beneficial for tamper resistance - it
 - [macOS Apps With Embedded Daemons](https://dev.to/brysontyrrell/macos-apps-with-embedded-daemons-333a)
 
 #### Daemon Tamper Resistance
-- [ ] **launchd KeepAlive** - Auto-restart if killed:
-  - Add `KeepAlive: true` to launchd plist
-  - Daemon restarts immediately if terminated via Activity Monitor
-  - Combined with locked blocks = robust protection
+- [x] **launchd KeepAlive** - Auto-restart if killed:
+  - [x] Add `KeepAlive: true` to launchd plist
+  - [x] Daemon restarts immediately if terminated via Activity Monitor
+  - [x] Combined with locked blocks = robust protection
 
-- [ ] **Hide daemon from UI** - Core "willpower" principle:
-  - No "Stop Daemon" button anywhere
-  - Settings shows status only ("Protected")
-  - Only "Reinstall" for troubleshooting (buried)
+- [x] **Hide daemon from UI** - Core "willpower" principle:
+  - [x] No "Stop Daemon" button anywhere
+  - [x] Settings shows status only ("Protected")
+  - [x] Only "Reinstall" for troubleshooting (buried)
 
 - [ ] **Daemon version sync**:
   - Store version in daemon's Info.plist
@@ -332,18 +334,26 @@ The "toggle in System Settings" UX is less beneficial for tamper resistance - it
 
 ### 2.2 IPC Architecture
 
-- [ ] **Migrate to App Groups for production**:
-  - **Development**: File-based IPC at `/tmp/willpower` (current)
-  - **Production**: App Groups or XPC
-  - App Groups: `~/Library/Group Containers/<group-id>/`
-  - XPC: More secure, built into SMAppService daemon pattern
-  - Update `IPCManager` to support both modes
+- [x] ~~**Migrate to App Groups for production**~~ - App Groups don't work due to macl (Mandatory Access Control Label)
 
-- [ ] **IPC security hardening**:
-  - File permissions: 0o600 (not 0o777)
-  - Validate command parameters
-  - Rate-limit commands
-  - Use XPC audit tokens for caller verification
+- [x] **File-based IPC implementation**:
+  - [x] IPC at `/Library/Application Support/Willpower/ipc/` (system-wide, secure location)
+  - [x] Three IPC files: state.json, commands.json, heartbeat
+  - [x] Command deduplication prevents race conditions
+  - [x] Stale command expiration (>30 seconds) prevents replay attacks
+
+- [ ] **Migrate to XPC for production** - Plan documented in TODO.md, will do in a future release
+
+- [x] **IPC security hardening** - **MOSTLY DONE**:
+  - [x] Role-based file permissions (IPCRole enum distinguishes app vs daemon)
+  - [x] Parent directory: 0o750 (owner rwx, admin group r-x)
+  - [x] IPC directory: 0o770 (owner and admin group rwx)
+  - [x] state.json: 0o640 (owner rw, admin group r)
+  - [x] commands.json: 0o660 (owner and admin group rw)
+  - [x] Admin group ownership (GID 80) enforced by daemon
+  - [x] Blocklist existence validation before activation
+  - [ ] Rate-limit commands
+  - [ ] Use XPC audit tokens for caller verification - depends on XPC implementation
 
 ### 2.3 Code Signing & Distribution
 
@@ -373,55 +383,62 @@ The "toggle in System Settings" UX is less beneficial for tamper resistance - it
 
 ### 2.4 Error Handling & Recovery
 
-- [ ] **Daemon crash recovery**:
-  - launchd KeepAlive auto-restarts
-  - App shows "Reconnecting..." during brief disconnect
-  - If persistent failure, show "Reinstall" prompt
+- [x] **Daemon crash recovery** - **PARTIAL**:
+  - [x] launchd KeepAlive auto-restarts daemon if terminated
+  - [x] Daemon loads current state from IPC files on startup
+  - [ ] App shows "Reconnecting..." during brief disconnect
+  - [x] If persistent failure, show "Reinstall" prompt
 
 - [ ] **State backup/recovery**:
-  - Backup state.json before each write
-  - Recover from backup on parse failure
-  - Never lose blocklist configurations
+  - [ ] Backup state.json before each write
+  - [ ] Recover from backup on parse failure
+  - [ ] Never lose blocklist configurations
 
-- [ ] **Graceful degradation**:
-  - App works for configuration even without daemon
-  - Clear indicator when blocking is inactive
-  - Sync to daemon when it becomes available
+- [x] **Graceful degradation** - **PARTIAL**:
+  - [x] App works for configuration even without daemon
+  - [x] Clear indicator when blocking is inactive (heartbeat detection)
+  - [x] Commands queued and sync to daemon when it becomes available
+  - [ ] Show "Reconnecting..." UI state during brief disconnects
 
 ### 2.5 Security Hardening
 
 - [ ] **Hosts file integrity**:
-  - Verify managed section markers before modification
-  - Detect external tampering
-  - Alert user if /etc/hosts was modified outside app
+  - [ ] Verify managed section markers before modification
+  - [ ] Detect external tampering
+  - [ ] Alert user if /etc/hosts was modified outside app
 
-- [ ] **Command validation**:
-  - Validate all IPC command parameters
-  - Sanitize domain inputs
-  - Prevent injection attacks
+- [x] **Command validation** - **PARTIAL**:
+  - [x] UI-level domain validation (format, characters, strips protocols/www)
+  - [x] UI-level URL pattern validation with regex support
+  - [x] Blocklist existence check before activation (daemon)
+  - [x] Empty command filtering to preserve state (daemon)
+  - [ ] Daemon-level command parameter sanitization
+  - [ ] Injection attack prevention at protocol level
 
 ### 2.6 Technical Debt
 
 - [ ] **Unit tests** - Priority areas:
-  - TriggerEvaluator schedule/visit logic
-  - IPCManager serialization
-  - HostsManager parsing
-  - ViewModel state management
+  - [ ] TriggerEvaluator schedule/visit logic
+  - [ ] IPCManager serialization
+  - [ ] HostsManager parsing
+  - [ ] ViewModel state management
 
 - [ ] **Integration tests**:
-  - App → IPC → Daemon → hosts file flow
-  - Schedule activation timing
-  - Visit count threshold triggering
+  - [ ] App → IPC → Daemon → hosts file flow
+  - [ ] Schedule activation timing
+  - [ ] Visit count threshold triggering
 
-- [ ] **Logging framework**:
-  - Replace print() with os_log
-  - Log levels: debug, info, error
-  - Redact sensitive data (domains?)
+- [x] **Logging framework** - **PARTIAL**:
+  - [x] DaemonManager uses os_log with Logger class
+  - [ ] Replace print() with os_log in daemon (currently uses custom log() + print())
+  - [ ] Replace print() with os_log in WillpowerKit (IPCManager, HostsManager, etc.)
+  - [ ] Consistent log levels: debug, info, error
+  - [ ] Redact sensitive data (domains?)
 
 - [ ] **CI/CD pipeline**:
-  - Automated builds
-  - Run tests
-  - Build notarized DMG for releases
+  - [ ] Automated builds
+  - [ ] Run tests
+  - [ ] Build notarized DMG for releases
 
 ---
 
@@ -443,9 +460,11 @@ The "toggle in System Settings" UX is less beneficial for tamper resistance - it
 
 ## Known Issues
 
-1. **Daemon must be manually installed** - Requires copying binary and running launchctl commands
+1. ~~**Daemon must be manually installed**~~ - **FIXED**: Now uses SMAppService.daemon with System Settings approval
 2. **First-time schedule evaluation** - May take up to 5 seconds for schedule to activate on creation
 3. **App Groups entitlement** - Currently unused but entitlement remains in project
+4. **No state backup** - Risk of configuration loss if state.json becomes corrupted
+5. **Mixed logging** - Inconsistent use of print() vs os_log across codebase
 
 ---
 
