@@ -100,6 +100,10 @@ final class WillpowerViewModel {
     /// Local storage key for independent triggers
     private let localTriggersKey = "willpower.local.triggers"
 
+    /// Tracks blocklist IDs with pending optimistic blocks (not yet confirmed by daemon)
+    /// Used to prevent syncState() from overwriting optimistic updates before daemon processes them
+    private var pendingOptimisticBlockIds: Set<UUID> = []
+
     // MARK: - Initialization
 
     init(ipcManager: IPCManager = IPCManager(role: .app)) {
@@ -155,8 +159,12 @@ final class WillpowerViewModel {
     // MARK: - State Synchronization
 
     /// Start polling for state updates from daemon
+    /// Idempotent - safe to call multiple times
     nonisolated func startStateSync() {
         Task { @MainActor in
+            // Prevent duplicate timers - this makes the function idempotent
+            guard syncTimer == nil else { return }
+
             syncState()
 
             // Start browser monitoring if there are visit-count triggers
@@ -263,8 +271,24 @@ final class WillpowerViewModel {
             // The app is the source of truth. We push TO daemon, never pull FROM.
             // This prevents daemon's stale state from overwriting optimistic updates.
 
-            // Only sync runtime state that daemon manages:
-            activeBlocks = state.activeBlocks.filter { !$0.isExpired }
+            // Merge daemon's active blocks with pending optimistic blocks
+            let daemonBlocks = state.activeBlocks.filter { !$0.isExpired }
+            let daemonBlocklistIds = Set(daemonBlocks.map { $0.blocklistId })
+
+            // Check which optimistic blocks are now confirmed by daemon
+            let confirmedIds = pendingOptimisticBlockIds.intersection(daemonBlocklistIds)
+            pendingOptimisticBlockIds.subtract(confirmedIds)
+
+            // Build merged block list: daemon blocks + unconfirmed optimistic blocks
+            var mergedBlocks = daemonBlocks
+            for blocklistId in pendingOptimisticBlockIds {
+                // Keep our optimistic block if daemon doesn't have it yet
+                if let optimisticBlock = activeBlocks.first(where: { $0.blocklistId == blocklistId && !$0.isExpired }) {
+                    mergedBlocks.append(optimisticBlock)
+                }
+            }
+
+            activeBlocks = mergedBlocks
             visitRecords = state.visitRecords
             daemonVersion = state.daemonVersion
         } else {
@@ -373,11 +397,32 @@ final class WillpowerViewModel {
             TimeBasedTrigger(durationSeconds: durationSeconds)
         )
 
+        // OPTIMISTIC UPDATE: Create local ActiveBlock immediately for instant UI feedback
+        // Daemon will confirm/reconcile on next sync (avoids 5-second poll delay)
+        let optimisticBlock = ActiveBlock(
+            blocklistId: blocklist.id,
+            domains: blocklist.domains,
+            expiresAt: Date().addingTimeInterval(TimeInterval(durationSeconds)),
+            reason: .timeBasedTrigger,
+            isLocked: isLocked
+        )
+
+        // Remove any existing block for this blocklist and add the new one
+        activeBlocks.removeAll { $0.blocklistId == blocklist.id }
+        activeBlocks.append(optimisticBlock)
+
+        // Track as pending until daemon confirms
+        pendingOptimisticBlockIds.insert(blocklist.id)
+
+        // Send command to daemon (async - daemon will process on next poll)
         do {
             try ipcManager.activateBlocklist(blocklist.id, trigger: trigger, isLocked: isLocked)
-            // Force immediate state sync to reflect activation
-            syncState()
+            // Note: Don't call syncState() here - it would read stale daemon state
+            // and overwrite our optimistic local update. The polling timer handles sync.
         } catch {
+            // Rollback optimistic update on IPC failure
+            activeBlocks.removeAll { $0.blocklistId == blocklist.id }
+            pendingOptimisticBlockIds.remove(blocklist.id)
             errorMessage = "Failed to activate blocklist: \(error.localizedDescription)"
         }
     }
@@ -389,11 +434,26 @@ final class WillpowerViewModel {
             return
         }
 
+        // Check if there's a locked block - daemon will reject deactivation
+        if let block = activeBlocks.first(where: { $0.blocklistId == blocklist.id }),
+           block.isLocked && !block.isExpired {
+            errorMessage = "Cannot deactivate: Block is locked until it expires"
+            return
+        }
+
+        // OPTIMISTIC UPDATE: Remove block locally for instant UI feedback
+        let removedBlock = activeBlocks.first { $0.blocklistId == blocklist.id }
+        activeBlocks.removeAll { $0.blocklistId == blocklist.id }
+        pendingOptimisticBlockIds.remove(blocklist.id)
+
         do {
             try ipcManager.deactivateBlocklist(blocklist.id)
-            // Force immediate state sync to reflect deactivation
-            syncState()
+            // Note: Don't call syncState() - polling timer handles sync
         } catch {
+            // Rollback: restore the block on IPC failure
+            if let block = removedBlock {
+                activeBlocks.append(block)
+            }
             errorMessage = "Failed to deactivate blocklist: \(error.localizedDescription)"
         }
     }
@@ -572,6 +632,12 @@ final class WillpowerViewModel {
     /// All enabled independent triggers
     var allIndependentTriggers: [IndependentTrigger] {
         independentTriggers
+    }
+
+    /// Check if the app needs to keep running in background for browser monitoring
+    /// Used by AppDelegate to show quit warning when visit-based triggers are active
+    var requiresBackgroundMonitoring: Bool {
+        independentTriggers.contains { $0.isEnabled }
     }
 
     // MARK: - Helpers
