@@ -84,20 +84,57 @@ else
 fi
 
 # Step 2: Sign any frameworks (if present)
+# IMPORTANT: Must sign inside-out - nested components first, then framework
 if [ -d "$APP_PATH/Contents/Frameworks" ]; then
-    log_info "Signing frameworks..."
+    log_info "Signing frameworks (inside-out)..."
 
     # Sign dylibs first
     find "$APP_PATH/Contents/Frameworks" -name "*.dylib" -type f 2>/dev/null | while read dylib; do
-        log_info "  Signing: $(basename "$dylib")"
+        log_info "  Signing dylib: $(basename "$dylib")"
         codesign --force --timestamp --options runtime \
             --sign "$SIGNING_IDENTITY" \
             "$dylib"
     done
 
-    # Sign frameworks
-    find "$APP_PATH/Contents/Frameworks" -name "*.framework" -type d 2>/dev/null | while read framework; do
-        log_info "  Signing: $(basename "$framework")"
+    # For each framework, sign nested components first
+    find "$APP_PATH/Contents/Frameworks" -name "*.framework" -type d -maxdepth 1 2>/dev/null | while read framework; do
+        log_info "  Processing framework: $(basename "$framework")"
+
+        # 1. Sign XPC services inside the framework (deepest first)
+        find "$framework" -name "*.xpc" -type d 2>/dev/null | while read xpc; do
+            log_info "    Signing XPC: $(basename "$xpc")"
+            codesign --force --timestamp --options runtime \
+                --sign "$SIGNING_IDENTITY" \
+                "$xpc"
+        done
+
+        # 2. Sign any embedded apps inside the framework
+        find "$framework" -name "*.app" -type d 2>/dev/null | while read app; do
+            log_info "    Signing embedded app: $(basename "$app")"
+            codesign --force --timestamp --options runtime \
+                --sign "$SIGNING_IDENTITY" \
+                "$app"
+        done
+
+        # 3. Sign standalone executables/binaries in Versions/*/
+        # (like Sparkle's Autoupdate binary)
+        # Use file command to find Mach-O binaries, as -perm is unreliable
+        find "$framework/Versions" -type f ! -name ".*" ! -name "*.plist" ! -name "*.strings" ! -name "*.nib" ! -name "*.png" ! -name "*.tiff" ! -name "*.icns" ! -name "*.car" ! -name "*.lproj" 2>/dev/null | while read candidate; do
+            # Skip if it's inside an .app or .xpc bundle (already signed)
+            if [[ "$candidate" == *".app/"* ]] || [[ "$candidate" == *".xpc/"* ]]; then
+                continue
+            fi
+            # Skip resource files and only sign Mach-O binaries
+            if file "$candidate" 2>/dev/null | grep -q "Mach-O"; then
+                log_info "    Signing binary: $(basename "$candidate")"
+                codesign --force --timestamp --options runtime \
+                    --sign "$SIGNING_IDENTITY" \
+                    "$candidate"
+            fi
+        done
+
+        # 4. Finally sign the framework itself
+        log_info "    Signing framework: $(basename "$framework")"
         codesign --force --timestamp --options runtime \
             --sign "$SIGNING_IDENTITY" \
             "$framework"
