@@ -19,16 +19,17 @@ public enum IPCRole: String, Sendable {
 }
 
 /// Manages IPC between Willpower app and daemon
-/// Uses file-based IPC with tighter permissions (admin group only)
-/// Falls back to UserDefaults if available
+/// Uses file-based IPC at /Library/Application Support/Willpower/ipc/
+/// with role-based permissions (admin group only)
+///
+/// Note: App Groups were removed because macOS macl (Mandatory Access Control Label)
+/// blocks root daemon access to user's App Groups container.
+/// TODO: Replace with XPC for more secure communication in a future release.
 public final class IPCManager: @unchecked Sendable {
 
     // MARK: - Constants
 
-    /// App Group identifier - must match in both app and daemon entitlements
-    public static let appGroupIdentifier = "group.P5AM8FWTFW.raviriley.Willpower"
-
-    /// IPC subdirectory within App Groups container
+    /// IPC subdirectory name
     private static let ipcSubdirectory = "ipc"
 
     /// Admin group ID for file ownership (used by daemon)
@@ -36,18 +37,13 @@ public final class IPCManager: @unchecked Sendable {
 
     // MARK: - IPC Paths (Computed)
 
-    /// Base IPC directory - computed based on context (app vs daemon)
+    /// Base IPC directory
     ///
-    /// NOTE: We use /Library/Application Support/Willpower for IPC because:
-    /// - App Groups containers have macOS macl (Mandatory Access Control Label) that blocks root access
-    /// - The daemon runs as root and cannot write to user's App Groups container
-    /// - Even with the App Groups entitlement, macl also checks UID (root != user)
-    /// - /Library/Application Support is accessible by both root and user processes
+    /// Uses /Library/Application Support/Willpower/ipc/ which is accessible
+    /// by both root (daemon) and user (app) processes.
     ///
     /// Security: Files are restricted to root:admin group with 0o640/0o660 permissions
-    /// TODO: Replace with XPC for more secure communication
     public static var ipcDirectory: String {
-        // Use a system-wide location that both root (daemon) and user (app) can access
         return "/Library/Application Support/Willpower/\(ipcSubdirectory)"
     }
 
@@ -55,25 +51,17 @@ public final class IPCManager: @unchecked Sendable {
     public static var commandsFile: String { ipcDirectory + "/commands.json" }
     public static var heartbeatFile: String { ipcDirectory + "/heartbeat" }
 
-    /// Keys for UserDefaults storage (fallback)
-    private enum Keys {
-        static let state = "willpower.state"
-        static let commands = "willpower.commands"
-        static let daemonHeartbeat = "willpower.daemon.heartbeat"
-        static let appVersion = "willpower.app.version"
-    }
-
     // MARK: - Properties
 
-    private let defaults: UserDefaults?
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
     private let fileManager = FileManager.default
     private let role: IPCRole
 
-    /// Whether App Groups access is available
+    /// Whether IPC is available (directory exists or can be created)
     public var isAvailable: Bool {
-        return defaults != nil || fileManager.isWritableFile(atPath: Self.ipcDirectory)
+        return fileManager.fileExists(atPath: Self.ipcDirectory) ||
+               fileManager.isWritableFile(atPath: "/Library/Application Support/Willpower")
     }
 
     // MARK: - Initialization
@@ -82,7 +70,6 @@ public final class IPCManager: @unchecked Sendable {
     /// - Parameter role: The role of this process (.app or .daemon)
     public init(role: IPCRole = .app) {
         self.role = role
-        self.defaults = UserDefaults(suiteName: Self.appGroupIdentifier)
         self.encoder = JSONEncoder()
         self.decoder = JSONDecoder()
 
@@ -92,10 +79,6 @@ public final class IPCManager: @unchecked Sendable {
 
         // Ensure IPC directory exists
         ensureIPCDirectory()
-
-        if defaults == nil {
-            logger.info("App Group UserDefaults not available, using file-based IPC")
-        }
     }
 
     /// Ensure the IPC directory exists with appropriate permissions
@@ -135,7 +118,6 @@ public final class IPCManager: @unchecked Sendable {
     public func saveState(_ state: WillpowerState) throws {
         let data = try encoder.encode(state)
 
-        // Primary: file-based
         ensureIPCDirectory()
         let url = URL(fileURLWithPath: Self.stateFile)
         try data.write(to: url, options: .atomic)
@@ -145,26 +127,15 @@ public final class IPCManager: @unchecked Sendable {
         if role == .daemon {
             try? fileManager.setAttributes([.groupOwnerAccountID: Self.adminGroupID], ofItemAtPath: Self.stateFile)
         }
-
-        // Fallback: also save to UserDefaults if available
-        defaults?.set(data, forKey: Keys.state)
-        defaults?.synchronize()
     }
 
     /// Load the current Willpower state
     public func loadState() throws -> WillpowerState? {
-        // Primary: try file-based first
         let url = URL(fileURLWithPath: Self.stateFile)
         if fileManager.fileExists(atPath: Self.stateFile),
            let data = try? Data(contentsOf: url) {
             return try decoder.decode(WillpowerState.self, from: data)
         }
-
-        // Fallback: try UserDefaults
-        if let defaults, let data = defaults.data(forKey: Keys.state) {
-            return try decoder.decode(WillpowerState.self, from: data)
-        }
-
         return nil
     }
 
@@ -225,37 +196,21 @@ public final class IPCManager: @unchecked Sendable {
         if role == .daemon {
             try? fileManager.setAttributes([.groupOwnerAccountID: Self.adminGroupID], ofItemAtPath: Self.commandsFile)
         }
-
-        // Also save to UserDefaults if available
-        defaults?.set(data, forKey: Keys.commands)
-        defaults?.synchronize()
     }
 
     /// Load pending commands (called by daemon)
     public func loadPendingCommands() throws -> [CommandWrapper] {
-        // Primary: try file-based first
         let url = URL(fileURLWithPath: Self.commandsFile)
         if fileManager.fileExists(atPath: Self.commandsFile),
            let data = try? Data(contentsOf: url) {
             return try decoder.decode([CommandWrapper].self, from: data)
         }
-
-        // Fallback: try UserDefaults
-        if let defaults, let data = defaults.data(forKey: Keys.commands) {
-            return try decoder.decode([CommandWrapper].self, from: data)
-        }
-
         return []
     }
 
     /// Clear all pending commands (called by daemon after processing)
     public func clearPendingCommands() throws {
-        // Remove file
         try? fileManager.removeItem(atPath: Self.commandsFile)
-
-        // Also clear UserDefaults
-        defaults?.removeObject(forKey: Keys.commands)
-        defaults?.synchronize()
     }
 
     /// Mark a specific command as processed by removing it
@@ -265,7 +220,6 @@ public final class IPCManager: @unchecked Sendable {
 
         if commands.isEmpty {
             try? fileManager.removeItem(atPath: Self.commandsFile)
-            defaults?.removeObject(forKey: Keys.commands)
         } else {
             let data = try encoder.encode(commands)
             let url = URL(fileURLWithPath: Self.commandsFile)
@@ -275,9 +229,7 @@ public final class IPCManager: @unchecked Sendable {
             if role == .daemon {
                 try? fileManager.setAttributes([.groupOwnerAccountID: Self.adminGroupID], ofItemAtPath: Self.commandsFile)
             }
-            defaults?.set(data, forKey: Keys.commands)
         }
-        defaults?.synchronize()
     }
 
     // MARK: - Daemon Heartbeat
@@ -286,7 +238,6 @@ public final class IPCManager: @unchecked Sendable {
     public func updateDaemonHeartbeat() {
         let timestamp = Date().timeIntervalSince1970
 
-        // Primary: write to file
         ensureIPCDirectory()
         let timestampString = String(timestamp)
         try? timestampString.write(toFile: Self.heartbeatFile, atomically: true, encoding: .utf8)
@@ -296,45 +247,25 @@ public final class IPCManager: @unchecked Sendable {
         if role == .daemon {
             try? fileManager.setAttributes([.groupOwnerAccountID: Self.adminGroupID], ofItemAtPath: Self.heartbeatFile)
         }
-
-        // Also update UserDefaults if available
-        defaults?.set(timestamp, forKey: Keys.daemonHeartbeat)
-        defaults?.synchronize()
     }
 
     /// Check if daemon is alive (heartbeat within threshold)
     public func isDaemonAlive(threshold: TimeInterval = 15.0) -> Bool {
-        // Primary: check file-based heartbeat
         if fileManager.fileExists(atPath: Self.heartbeatFile),
            let contents = try? String(contentsOfFile: Self.heartbeatFile, encoding: .utf8),
            let timestamp = TimeInterval(contents) {
             return Date().timeIntervalSince1970 - timestamp < threshold
         }
-
-        // Fallback: check UserDefaults
-        if let defaults,
-           let timestamp = defaults.object(forKey: Keys.daemonHeartbeat) as? TimeInterval {
-            return Date().timeIntervalSince1970 - timestamp < threshold
-        }
-
         return false
     }
 
     /// Get last daemon heartbeat time
     public func lastDaemonHeartbeat() -> Date? {
-        // Primary: check file-based heartbeat
         if fileManager.fileExists(atPath: Self.heartbeatFile),
            let contents = try? String(contentsOfFile: Self.heartbeatFile, encoding: .utf8),
            let timestamp = TimeInterval(contents) {
             return Date(timeIntervalSince1970: timestamp)
         }
-
-        // Fallback: check UserDefaults
-        if let defaults,
-           let timestamp = defaults.object(forKey: Keys.daemonHeartbeat) as? TimeInterval {
-            return Date(timeIntervalSince1970: timestamp)
-        }
-
         return nil
     }
 
@@ -391,18 +322,16 @@ public final class IPCManager: @unchecked Sendable {
 
     /// Clear all IPC data (for testing/debugging only)
     public func clearAllData() {
-        guard let defaults else { return }
-        defaults.removeObject(forKey: Keys.state)
-        defaults.removeObject(forKey: Keys.commands)
-        defaults.removeObject(forKey: Keys.daemonHeartbeat)
-        defaults.synchronize()
+        try? fileManager.removeItem(atPath: Self.stateFile)
+        try? fileManager.removeItem(atPath: Self.commandsFile)
+        try? fileManager.removeItem(atPath: Self.heartbeatFile)
     }
 
     /// Get debug description of current IPC state
     public func debugDescription() -> String {
         var lines: [String] = []
         lines.append("=== IPCManager Debug Info ===")
-        lines.append("App Group: \(Self.appGroupIdentifier)")
+        lines.append("IPC Directory: \(Self.ipcDirectory)")
         lines.append("Available: \(isAvailable)")
 
         if let heartbeat = lastDaemonHeartbeat() {
@@ -434,14 +363,14 @@ public final class IPCManager: @unchecked Sendable {
 
 extension IPCManager {
     public enum IPCError: Error, LocalizedError {
-        case appGroupsUnavailable
+        case ipcUnavailable
         case encodingFailed(underlying: Error)
         case decodingFailed(underlying: Error)
 
         public var errorDescription: String? {
             switch self {
-            case .appGroupsUnavailable:
-                return "App Groups not available. Check entitlements configuration."
+            case .ipcUnavailable:
+                return "IPC not available. Ensure daemon has created the IPC directory."
             case .encodingFailed(let e):
                 return "Failed to encode data: \(e.localizedDescription)"
             case .decodingFailed(let e):

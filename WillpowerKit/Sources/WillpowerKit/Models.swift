@@ -380,7 +380,7 @@ public struct VisitRecord: Codable, Sendable, Identifiable, Equatable {
 
 // MARK: - Willpower State (Full IPC State)
 
-/// Complete state shared between App and Daemon via App Groups
+/// Complete state shared between App and Daemon via file-based IPC
 public struct WillpowerState: Codable, Sendable {
     /// All configured blocklists
     public var blocklists: [BlocklistConfig]

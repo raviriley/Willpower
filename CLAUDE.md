@@ -33,15 +33,23 @@ cd WillpowerKit && swift test
 
 ### Key Technologies
 - SwiftUI + SwiftData for UI and persistence
-- Network.framework for traffic monitoring (planned)
-- SMJobBless for privileged helper installation (planned)
-- App Groups for IPC between app and daemon
+- SMAppService.daemon for privileged helper registration (macOS 13+)
+- File-based IPC at `/Library/Application Support/Willpower/ipc/`
+- PF (packet filter) firewall for network-level blocking
+- AppleScript for browser URL monitoring
 
 ### Data Flow
 1. User creates blocklists in SwiftUI app (stored via SwiftData)
-2. App communicates configuration to daemon (via App Groups)
+2. App communicates configuration to daemon via file-based IPC (state.json, commands.json)
 3. Daemon modifies `/etc/hosts` with blocked domains
-4. Domains are blocked using markers: `## WILLPOWER-START` / `## WILLPOWER-END`
+4. Daemon also applies PF firewall rules for network-level blocking
+5. Domains are blocked using markers: `## WILLPOWER-START` / `## WILLPOWER-END`
+
+### IPC Architecture
+- **Location**: `/Library/Application Support/Willpower/ipc/`
+- **Files**: `state.json` (daemon → app), `commands.json` (app → daemon), `heartbeat`
+- **Permissions**: Role-based (root:admin group, 0o640/0o660)
+- **Note**: App Groups don't work due to macOS macl blocking root access. XPC planned for future.
 
 ### Concurrency Model
 - Swift Concurrency with MainActor default isolation
@@ -49,20 +57,29 @@ cd WillpowerKit && swift test
 
 ## Implementation Status
 
-Currently early-stage with boilerplate code. See `plan.md` for the 5-phase implementation roadmap:
-- Phase 1: Core Engine (Models, HostsManager) - **in progress**
-- Phase 2: Traffic Monitoring (Network.framework)
-- Phase 3: SwiftUI App & Persistence
-- Phase 4: LaunchDaemon Integration (SMJobBless)
-- Phase 5: Manual Testing
+Core functionality is complete. See `CHANGELOG.md` for detailed status:
+- **Phase 1 (NOW)**: Core features & polish - mostly complete
+- **Phase 2 (LATER)**: Distribution & infrastructure - in progress
+- **Phase 3 (POST-LAUNCH)**: Feature enhancements - planned
+
+Key completed features:
+- Full SwiftUI app with MVVM architecture
+- Daemon with SMAppService.daemon registration
+- Dual-layer blocking (hosts file + PF firewall)
+- Schedule-based and visit-count triggers
+- Browser URL monitoring via AppleScript
 
 ## Key Files
 
-- `WillpowerKit/Sources/WillpowerKit/Models.swift` - BlocklistConfig, TriggerConfig structs
+- `WillpowerKit/Sources/WillpowerKit/Models.swift` - BlocklistConfig, TriggerConfig, WillpowerState structs
+- `WillpowerKit/Sources/WillpowerKit/IPCManager.swift` - File-based IPC between app and daemon
 - `WillpowerKit/Sources/WillpowerKit/HostsManager.swift` - /etc/hosts manipulation
+- `WillpowerKit/Sources/WillpowerKit/PacketFilterManager.swift` - PF firewall rules
+- `WillpowerKit/Sources/WillpowerKit/Logger.swift` - Unified os_log logging
 - `WillpowerDaemon/main.swift` - Daemon entry point and run loop
-- `Willpower/WillpowerApp.swift` - App entry with SwiftData ModelContainer
-- `plan.md` - Detailed implementation plan with pseudo-code examples
+- `Willpower/ViewModels/WillpowerViewModel.swift` - Central app state management
+- `Willpower/DaemonManager.swift` - SMAppService.daemon registration
+- `CHANGELOG.md` - Development history and TODO tracking
 
 ## Build Configuration
 
