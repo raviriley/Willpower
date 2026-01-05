@@ -272,7 +272,7 @@ struct BlocklistDetailView: View {
                                 } label: {
                                     HStack {
                                         Image(systemName: preset.icon)
-                                            .foregroundStyle(.blue)
+                                            .foregroundStyle(Color.accentColor)
                                             .frame(width: 24)
                                         VStack(alignment: .leading) {
                                             Text(preset.rawValue)
@@ -283,7 +283,7 @@ struct BlocklistDetailView: View {
                                         }
                                         Spacer()
                                         Image(systemName: "plus.circle")
-                                            .foregroundStyle(.blue)
+                                            .foregroundStyle(Color.accentColor)
                                     }
                                 }
                                 .buttonStyle(.plain)
@@ -338,7 +338,7 @@ struct BlocklistDetailView: View {
                                     Image(systemName: "plus.circle.fill")
                                 }
                                 .buttonStyle(.plain)
-                                .foregroundStyle(newDomain.trimmingCharacters(in: .whitespaces).isEmpty ? Color.secondary : Color.blue)
+                                .foregroundStyle(newDomain.trimmingCharacters(in: .whitespaces).isEmpty ? Color.secondary : Color.accentColor)
                                 .disabled(newDomain.trimmingCharacters(in: .whitespaces).isEmpty)
                             }
 
@@ -525,7 +525,7 @@ struct TriggerSummaryRow: View {
         } label: {
             HStack {
                 Image(systemName: trigger.type.icon)
-                    .foregroundStyle(trigger.isEnabled ? .blue : .gray)
+                    .foregroundStyle(trigger.isEnabled ? Color.accentColor : Color.gray)
 
                 VStack(alignment: .leading) {
                     Text(trigger.type.displayName)

@@ -17,7 +17,7 @@ struct DaemonSetupView: View {
             // Icon
             Image(systemName: "shield.checkered")
                 .font(.system(size: 64))
-                .foregroundStyle(.blue)
+                .foregroundStyle(Color.accentColor)
 
             // Title
             Text("Install Background Helper")

@@ -106,7 +106,7 @@ struct OnboardingView: View {
         if step.rawValue < currentStep.rawValue {
             return .green
         } else if step == currentStep {
-            return .blue
+            return .accentColor
         } else {
             return .secondary.opacity(0.3)
         }
@@ -125,7 +125,7 @@ struct WelcomeStepView: View {
             // App icon placeholder
             Image(systemName: "brain.head.profile")
                 .font(.system(size: 80))
-                .foregroundStyle(.blue)
+                .foregroundStyle(Color.accentColor)
 
             VStack(spacing: 16) {
                 Text("Take Control of Your Attention")
@@ -170,7 +170,7 @@ struct FeatureRow: View {
         HStack(spacing: 12) {
             Image(systemName: icon)
                 .font(.title2)
-                .foregroundStyle(.blue)
+                .foregroundStyle(Color.accentColor)
                 .frame(width: 32)
 
             VStack(alignment: .leading, spacing: 2) {
@@ -198,7 +198,7 @@ struct DaemonSetupStepView: View {
             // Icon
             Image(systemName: "shield.checkered")
                 .font(.system(size: 64))
-                .foregroundStyle(daemonManager.isEnabled ? .green : .blue)
+                .foregroundStyle(daemonManager.isEnabled ? Color.green : Color.accentColor)
 
             // Title
             Text(daemonManager.isEnabled ? "Background Helper Installed" : "Install Background Helper")

@@ -137,7 +137,7 @@ struct ScheduleRowView: View {
     var body: some View {
         HStack {
             Image(systemName: isActive ? "clock.badge.checkmark.fill" : "calendar.badge.clock")
-                .foregroundStyle(isActive ? .green : (trigger.isEnabled ? .blue : .gray))
+                .foregroundStyle(isActive ? Color.green : (trigger.isEnabled ? Color.accentColor : Color.gray))
                 .font(.title2)
 
             VStack(alignment: .leading, spacing: 4) {

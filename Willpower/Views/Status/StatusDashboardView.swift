@@ -45,7 +45,7 @@ struct StatusDashboardView: View {
                         title: "Blocklists",
                         value: "\(viewModel.blocklists.count)",
                         icon: "list.bullet",
-                        color: .blue
+                        color: .accentColor
                     )
                 }
 
