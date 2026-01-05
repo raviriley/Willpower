@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		BA2FBB682F0BE977003F8785 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = BA2FBB672F0BE977003F8785 /* Sparkle */; };
 		BA54CBBF2F03506200E56C58 /* WillpowerKit in Frameworks */ = {isa = PBXBuildFile; productRef = BA54CBBE2F03506200E56C58 /* WillpowerKit */; };
 		BA54CBC12F03507000E56C58 /* WillpowerKit in Frameworks */ = {isa = PBXBuildFile; productRef = BA54CBC02F03507000E56C58 /* WillpowerKit */; };
 		BA54CBFA2F03AB8600E56C58 /* WillpowerDaemon in Copy Daemon Binary */ = {isa = PBXBuildFile; fileRef = BA68A52F2F03466D00112297 /* WillpowerDaemon */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
@@ -94,6 +95,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BA2FBB682F0BE977003F8785 /* Sparkle in Frameworks */,
 				BA54CBBF2F03506200E56C58 /* WillpowerKit in Frameworks */,
 				BA54CBFF2F03ABEF00E56C58 /* ServiceManagement.framework in Frameworks */,
 			);
@@ -162,6 +164,7 @@
 			name = Willpower;
 			packageProductDependencies = (
 				BA54CBBE2F03506200E56C58 /* WillpowerKit */,
+				BA2FBB672F0BE977003F8785 /* Sparkle */,
 			);
 			productName = Willpower;
 			productReference = BA68A51B2F03461E00112297 /* Willpower.app */;
@@ -217,6 +220,9 @@
 			);
 			mainGroup = BA68A5122F03461E00112297;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				BA2FBB662F0BE977003F8785 /* XCRemoteSwiftPackageReference "Sparkle" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = BA68A51C2F03461E00112297 /* Products */;
 			projectDirPath = "";
@@ -398,7 +404,8 @@
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Willpower/Info.plist;
 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Willpower needs to monitor your browser tabs to track visits to specific websites. This enables visit-count triggers that automatically block distracting sites after too many visits.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -433,7 +440,8 @@
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Willpower/Info.plist;
 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Willpower needs to monitor your browser tabs to track visits to specific websites. This enables visit-count triggers that automatically block distracting sites after too many visits.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -546,7 +554,23 @@
 		};
 /* End XCConfigurationList section */
 
+/* Begin XCRemoteSwiftPackageReference section */
+		BA2FBB662F0BE977003F8785 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.8.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
 /* Begin XCSwiftPackageProductDependency section */
+		BA2FBB672F0BE977003F8785 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BA2FBB662F0BE977003F8785 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
 		BA54CBBE2F03506200E56C58 /* WillpowerKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = WillpowerKit;
