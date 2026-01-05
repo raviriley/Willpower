@@ -12,10 +12,6 @@
     <true/>
     <key>UserName</key>
     <string>root</string>
-    <key>StandardErrorPath</key>
-    <string>/var/log/willpower-daemon.err.log</string>
-    <key>StandardOutPath</key>
-    <string>/var/log/willpower-daemon.out.log</string>
     <key>AssociatedBundleIdentifiers</key>
     <array>
         <string>raviriley.Willpower</string>
