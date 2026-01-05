@@ -355,27 +355,35 @@ The "toggle in System Settings" UX is less beneficial for tamper resistance - it
   - [ ] Rate-limit commands
   - [ ] Use XPC audit tokens for caller verification - depends on XPC implementation
 
-### 2.3 Code Signing & Distribution
+### 2.3 Code Signing & Distribution ✅
 
 #### Code Signing
-- [ ] **Developer ID signing**:
-  - Sign main app with "Developer ID Application"
-  - Sign daemon with "Developer ID Application"
-  - Enable Hardened Runtime for both
-  - Specific entitlements for SMAppService daemon
+- [x] **Developer ID signing**:
+  - [x] Sign main app with "Developer ID Application"
+  - [x] Sign daemon with "Developer ID Application"
+  - [x] Enable Hardened Runtime for both
+  - [x] Inside-out signing for Sparkle framework (XPCs, Autoupdate, etc.)
+  - [x] Automated via `scripts/codesign.sh`
 
 #### Notarization
-- [ ] **Notarize for Gatekeeper**:
-  - Submit to Apple's notarization service
-  - Staple ticket to app bundle
-  - Test on clean macOS (no Xcode/developer tools)
+- [x] **Notarize for Gatekeeper**:
+  - [x] Submit to Apple's notarization service
+  - [x] Staple ticket to app bundle
+  - [x] Automated via `scripts/notarize.sh`
 
 #### Distribution
-- [ ] **Direct distribution (DMG)**:
-  - App Store not viable (privileged helper not allowed)
-  - Create DMG with drag-to-Applications
-  - Include uninstaller or uninstall instructions
-  - Consider Sparkle for auto-updates
+- [x] **Direct distribution (DMG)**:
+  - [x] App Store not viable (privileged helper not allowed)
+  - [x] Create DMG with drag-to-Applications via `scripts/create-dmg.sh`
+  - [x] DMG signed and notarized
+  - [x] Full release automation via `scripts/release.sh`
+
+- [x] **Sparkle auto-updates**:
+  - [x] Sparkle 2.8.1 integrated via SPM
+  - [x] EdDSA signing keys in Keychain
+  - [x] Appcast generation via `scripts/generate-appcast.sh`
+  - [x] GitHub Releases hosting for DMG and appcast
+  - [x] Full GitHub release automation via `scripts/github-release.sh`
 
 - [ ] **Homebrew Cask** - For power users:
   - Create cask formula
