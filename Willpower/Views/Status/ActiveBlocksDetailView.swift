@@ -74,40 +74,13 @@ struct TriggerBlockGroupView: View {
     }
 
     var body: some View {
-        GroupBox {
-            VStack(alignment: .leading, spacing: 8) {
-                Text(trigger.name)
-                    .font(.headline)
-
-                ForEach(blockedDomains, id: \.self) { domain in
-                    HStack(spacing: 6) {
-                        Image(systemName: "globe")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Text(domain)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                Text(ActiveBlock.BlockReason.visitCountTrigger.displayName)
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-
-                if let block = firstBlock {
-                    if let expiresAt = block.expiresAt {
-                        HStack {
-                            Text("Expires:")
-                            TimeRemainingView(expiresAt: expiresAt)
-                        }
-                    }
-
-                    if block.isLocked {
-                        StatusBadge(text: "LOCKED", color: .red)
-                    }
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
+        ActiveBlockCard(
+            title: trigger.name,
+            reason: .visitCountTrigger,
+            domains: blockedDomains,
+            expiresAt: firstBlock?.expiresAt,
+            isLocked: firstBlock?.isLocked ?? false
+        )
     }
 }
 
@@ -118,37 +91,137 @@ struct BlocklistBlockView: View {
     let blocklist: BlocklistConfig?
 
     var body: some View {
-        GroupBox {
-            VStack(alignment: .leading, spacing: 8) {
-                if let blocklist {
-                    Text(blocklist.name)
+        ActiveBlockCard(
+            title: blocklist?.name ?? "Unknown",
+            reason: block.reason,
+            domains: block.domains,
+            expiresAt: block.expiresAt,
+            isLocked: block.isLocked
+        )
+    }
+}
+
+// MARK: - Active Block Card
+
+struct ActiveBlockCard: View {
+    let title: String
+    let reason: ActiveBlock.BlockReason
+    let domains: [String]
+    let expiresAt: Date?
+    let isLocked: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Header: Title + Reason on left, Badge + Timer on right
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(title)
                         .font(.headline)
+                    ReasonBadge(reason: reason)
                 }
 
-                Text("\(block.domains.count) domains blocked")
-                    .foregroundStyle(.secondary)
+                Spacer()
 
-                Text(block.reason.displayName)
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
+                VStack(alignment: .trailing, spacing: 4) {
+                    StatusBadge(
+                        text: isLocked ? "LOCKED" : "ACTIVE",
+                        color: isLocked ? .red : .orange
+                    )
 
-                if let expiresAt = block.expiresAt {
-                    HStack {
-                        Text("Expires:")
-                        TimeRemainingView(expiresAt: expiresAt)
+                    if let expiresAt {
+                        HStack(spacing: 4) {
+                            Image(systemName: "clock")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            TimeRemainingView(expiresAt: expiresAt)
+                        }
+                    } else {
+                        Text("Indefinite")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
                 }
+            }
 
-                if block.isLocked {
-                    StatusBadge(text: "LOCKED", color: .red)
+            // Divider
+            Divider()
+                .padding(.vertical, 10)
+
+            // Domains list
+            DomainsListView(domains: domains)
+        }
+        .padding()
+        .background(.background.secondary)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+}
+
+// MARK: - Domains List View
+
+struct DomainsListView: View {
+    let domains: [String]
+
+    private let columns = [
+        GridItem(.flexible(), alignment: .leading),
+        GridItem(.flexible(), alignment: .leading)
+    ]
+
+    var body: some View {
+        if domains.count <= 4 {
+            // Single column for few domains
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(domains, id: \.self) { domain in
+                    DomainRow(domain: domain)
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+        } else {
+            // Two-column grid for many domains
+            LazyVGrid(columns: columns, alignment: .leading, spacing: 6) {
+                ForEach(domains, id: \.self) { domain in
+                    DomainRow(domain: domain)
+                }
+            }
         }
     }
 }
 
-// MARK: - BlockReason Display Name
+struct DomainRow: View {
+    let domain: String
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "globe")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+            Text(domain)
+                .font(.callout)
+                .foregroundStyle(.primary.opacity(0.8))
+        }
+    }
+}
+
+// MARK: - Reason Badge
+
+struct ReasonBadge: View {
+    let reason: ActiveBlock.BlockReason
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Image(systemName: reason.iconName)
+                .font(.caption)
+            Text(reason.displayName)
+                .font(.caption)
+                .fontWeight(.medium)
+        }
+        .foregroundStyle(reason.color)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(reason.color.opacity(0.12))
+        .clipShape(Capsule())
+    }
+}
+
+// MARK: - BlockReason Display Properties
 
 extension ActiveBlock.BlockReason {
     var displayName: String {
@@ -159,6 +232,28 @@ extension ActiveBlock.BlockReason {
             return "Scheduled"
         case .visitCountTrigger:
             return "Visit threshold exceeded"
+        }
+    }
+
+    var iconName: String {
+        switch self {
+        case .manualActivation, .timeBasedTrigger:
+            return "play.fill"
+        case .scheduleBasedTrigger:
+            return "calendar.badge.clock"
+        case .visitCountTrigger:
+            return "eye.trianglebadge.exclamationmark"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .manualActivation, .timeBasedTrigger:
+            return .blue
+        case .scheduleBasedTrigger:
+            return .purple
+        case .visitCountTrigger:
+            return .orange.opacity(0.8)
         }
     }
 }
