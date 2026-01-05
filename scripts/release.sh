@@ -19,45 +19,13 @@
 
 set -e
 
-# Configuration
+# Load shared configuration
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-SCRIPTS_DIR="$PROJECT_DIR/scripts"
-BUILD_DIR="$PROJECT_DIR/build"
-RELEASES_DIR="$PROJECT_DIR/releases"
+source "$PROJECT_DIR/scripts/config.sh"
+
+# Script-specific config
 SCHEME="Willpower"
 CONFIGURATION="Release"
-
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-MAGENTA='\033[0;35m'
-NC='\033[0m' # No Color
-
-log_info() {
-    echo -e "${GREEN}[INFO]${NC} $1"
-}
-
-log_warn() {
-    echo -e "${YELLOW}[WARN]${NC} $1"
-}
-
-log_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-}
-
-log_step() {
-    echo -e "${BLUE}[STEP]${NC} $1"
-}
-
-log_header() {
-    echo ""
-    echo -e "${MAGENTA}════════════════════════════════════════════════════════════${NC}"
-    echo -e "${MAGENTA}  $1${NC}"
-    echo -e "${MAGENTA}════════════════════════════════════════════════════════════${NC}"
-    echo ""
-}
 
 # Validate arguments
 VERSION="$1"
@@ -92,8 +60,7 @@ fi
 XCODE_VERSION=$(xcodebuild -version | head -1)
 log_info "Xcode: $XCODE_VERSION"
 
-# Check signing identity
-SIGNING_IDENTITY="Developer ID Application: Ravi Riley (NJ2SQLUU4U)"
+# Check signing identity (from config.sh)
 if ! security find-identity -v -p codesigning | grep -q "$SIGNING_IDENTITY"; then
     log_error "Signing identity not found: $SIGNING_IDENTITY"
     exit 1

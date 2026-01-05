@@ -18,32 +18,12 @@
 
 set -e
 
+# Load shared configuration
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-RELEASES_DIR="$PROJECT_DIR/releases"
-OUTPUT_DIR="$PROJECT_DIR/build/appcast"
+source "$PROJECT_DIR/scripts/config.sh"
 
-# Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
-
-log_info() {
-    echo -e "${GREEN}[INFO]${NC} $1"
-}
-
-log_warn() {
-    echo -e "${YELLOW}[WARN]${NC} $1"
-}
-
-log_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-}
-
-log_step() {
-    echo -e "${BLUE}[STEP]${NC} $1"
-}
+# Script-specific paths
+OUTPUT_DIR="$BUILD_DIR/appcast"
 
 echo ""
 echo -e "${BLUE}════════════════════════════════════════════════════════════${NC}"

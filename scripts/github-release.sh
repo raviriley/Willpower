@@ -16,31 +16,9 @@
 
 set -e
 
+# Load shared configuration
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-SCRIPTS_DIR="$PROJECT_DIR/scripts"
-RELEASES_DIR="$PROJECT_DIR/releases"
-BUILD_DIR="$PROJECT_DIR/build"
-REPO="raviriley/Willpower"
-
-# Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-MAGENTA='\033[0;35m'
-NC='\033[0m'
-
-log_info() { echo -e "${GREEN}[INFO]${NC} $1"; }
-log_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
-log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
-log_step() { echo -e "${BLUE}[STEP]${NC} $1"; }
-log_header() {
-    echo ""
-    echo -e "${MAGENTA}════════════════════════════════════════════════════════════${NC}"
-    echo -e "${MAGENTA}  $1${NC}"
-    echo -e "${MAGENTA}════════════════════════════════════════════════════════════${NC}"
-    echo ""
-}
+source "$PROJECT_DIR/scripts/config.sh"
 
 VERSION="$1"
 if [ -z "$VERSION" ]; then
@@ -86,7 +64,7 @@ fi
 log_step "Generating appcast.xml..."
 
 # Set download URL prefix for GitHub Releases
-export SPARKLE_DOWNLOAD_URL="https://github.com/$REPO/releases/download/v$VERSION/"
+export SPARKLE_DOWNLOAD_URL="https://github.com/$GITHUB_REPO/releases/download/v$VERSION/"
 
 "$SCRIPTS_DIR/generate-appcast.sh" || {
     log_warn "Appcast generation had issues, creating manually..."
@@ -128,7 +106,7 @@ if [ ! -f "$APPCAST_PATH" ]; then
           <li>See release notes on GitHub</li>
         </ul>
       ]]></description>
-      <enclosure url="https://github.com/$REPO/releases/download/v$VERSION/Willpower-$VERSION.dmg"
+      <enclosure url="https://github.com/$GITHUB_REPO/releases/download/v$VERSION/Willpower-$VERSION.dmg"
                  type="application/octet-stream"
                  length="$DMG_SIZE"
                  sparkle:edSignature="$SIGNATURE"/>
@@ -139,29 +117,7 @@ EOF
     log_info "Created basic appcast.xml"
 fi
 
-# Step 3: Sign the DMG for Sparkle if not already done
-log_step "Ensuring DMG is signed for Sparkle..."
-SPARKLE_SIGN=$(find ~/Library/Developer/Xcode/DerivedData -name "sign_update" -type f 2>/dev/null | head -1)
-if [ -n "$SPARKLE_SIGN" ] && [ -x "$SPARKLE_SIGN" ]; then
-    log_info "Signing DMG with Sparkle EdDSA key..."
-    SIGN_OUTPUT=$("$SPARKLE_SIGN" "$DMG_PATH" 2>&1)
-    log_info "Signature: $(echo "$SIGN_OUTPUT" | head -1)"
-
-    # Update appcast with signature if needed
-    if [ -f "$APPCAST_PATH" ]; then
-        SIGNATURE=$(echo "$SIGN_OUTPUT" | grep -o 'sparkle:edSignature="[^"]*"' | sed 's/sparkle:edSignature="//;s/"//')
-        if [ -n "$SIGNATURE" ]; then
-            # Update the signature in appcast (use | delimiter to avoid issues with / in base64)
-            # Escape any | characters in the signature
-            ESCAPED_SIG=$(echo "$SIGNATURE" | sed 's/|/\\|/g')
-            sed -i '' "s|sparkle:edSignature=\"[^\"]*\"|sparkle:edSignature=\"$ESCAPED_SIG\"|" "$APPCAST_PATH"
-        fi
-    fi
-else
-    log_warn "Sparkle sign_update tool not found - appcast signature may be missing"
-fi
-
-# Step 4: Create GitHub Release
+# Step 3: Create GitHub Release
 log_step "Creating GitHub Release v$VERSION..."
 
 # Create release notes
@@ -186,12 +142,12 @@ EOF
 )
 
 # Check if release already exists
-if gh release view "v$VERSION" --repo "$REPO" &>/dev/null; then
+if gh release view "v$VERSION" --repo "$GITHUB_REPO" &>/dev/null; then
     log_warn "Release v$VERSION already exists"
     read -p "Delete and recreate? (y/N) " -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
-        gh release delete "v$VERSION" --repo "$REPO" --yes
+        gh release delete "v$VERSION" --repo "$GITHUB_REPO" --yes
     else
         log_error "Aborted"
         exit 1
@@ -200,7 +156,7 @@ fi
 
 # Create release
 gh release create "v$VERSION" \
-    --repo "$REPO" \
+    --repo "$GITHUB_REPO" \
     --title "Willpower v$VERSION" \
     --notes "$RELEASE_NOTES" \
     "$DMG_PATH" \
@@ -208,10 +164,10 @@ gh release create "v$VERSION" \
 
 log_header "Release Complete!"
 
-log_info "GitHub Release: https://github.com/$REPO/releases/tag/v$VERSION"
+log_info "GitHub Release: https://github.com/$GITHUB_REPO/releases/tag/v$VERSION"
 log_info ""
 log_info "Downloads:"
-log_info "  DMG: https://github.com/$REPO/releases/download/v$VERSION/Willpower-$VERSION.dmg"
-log_info "  Appcast: https://github.com/$REPO/releases/download/v$VERSION/appcast.xml"
+log_info "  DMG: https://github.com/$GITHUB_REPO/releases/download/v$VERSION/Willpower-$VERSION.dmg"
+log_info "  Appcast: https://github.com/$GITHUB_REPO/releases/download/v$VERSION/appcast.xml"
 log_info ""
 log_info "Users with existing installations will be notified of the update!"
