@@ -6,6 +6,9 @@
 //
 
 import Foundation
+import os.log
+
+private let logger = WillpowerLogger.ipc
 
 // MARK: - Role Enum
 
@@ -91,7 +94,7 @@ public final class IPCManager: @unchecked Sendable {
         ensureIPCDirectory()
 
         if defaults == nil {
-            print("[IPCManager] App Group UserDefaults not available, using file-based IPC")
+            logger.info("App Group UserDefaults not available, using file-based IPC")
         }
     }
 
@@ -122,7 +125,7 @@ public final class IPCManager: @unchecked Sendable {
             if role == .daemon {
                 try? fileManager.setAttributes([.groupOwnerAccountID: Self.adminGroupID], ofItemAtPath: path)
             }
-            print("[IPCManager] Created IPC directory: \(path)")
+            logger.info("Created IPC directory: \(path)")
         }
     }
 
@@ -170,7 +173,7 @@ public final class IPCManager: @unchecked Sendable {
         do {
             return try loadState() ?? WillpowerState()
         } catch {
-            print("[IPCManager] Error loading state: \(error). Returning default.")
+            logger.error("Error loading state: \(error.localizedDescription). Returning default.")
             return WillpowerState()
         }
     }
@@ -191,7 +194,7 @@ public final class IPCManager: @unchecked Sendable {
                 return false
             }
             if beforeCount != commands.count {
-                print("[IPCManager] Deduplicated \(beforeCount - commands.count) stale updateBlocklists command(s)")
+                logger.debug("Deduplicated \(beforeCount - commands.count) stale updateBlocklists command(s)")
             }
         }
 
@@ -203,7 +206,7 @@ public final class IPCManager: @unchecked Sendable {
                 return false
             }
             if beforeCount != commands.count {
-                print("[IPCManager] Deduplicated \(beforeCount - commands.count) stale updateIndependentTriggers command(s)")
+                logger.debug("Deduplicated \(beforeCount - commands.count) stale updateIndependentTriggers command(s)")
             }
         }
 

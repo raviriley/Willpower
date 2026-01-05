@@ -7,6 +7,9 @@
 
 import Foundation
 import AppKit
+import os.log
+
+private let logger = WillpowerLogger.browser
 
 /// Monitors browser tabs for URL patterns using AppleScript
 public actor BrowserMonitor {
@@ -221,7 +224,7 @@ public actor BrowserMonitor {
             }
         }
 
-        print("[BrowserMonitor] Started monitoring with \(pollingInterval)s interval")
+        logger.info("Started monitoring with \(pollingInterval)s interval")
     }
 
     /// Stop monitoring
@@ -229,7 +232,7 @@ public actor BrowserMonitor {
         isMonitoring = false
         monitoringTask?.cancel()
         monitoringTask = nil
-        print("[BrowserMonitor] Stopped monitoring")
+        logger.info("Stopped monitoring")
     }
 
     /// Check if monitoring is active
@@ -312,7 +315,7 @@ public actor BrowserMonitor {
         visitRecords[pattern.id] = record
         lastVisitTimes[pattern.id] = Date()
 
-        print("[BrowserMonitor] Visit recorded: \(pattern.pattern) - count: \(record.visitCount)")
+        logger.debug("Visit recorded: \(pattern.pattern) - count: \(record.visitCount)")
 
         // Notify callback
         await onPatternMatch?(pattern, record)
@@ -338,7 +341,7 @@ public actor BrowserMonitor {
             // Don't log errors for browsers that aren't scriptable or not running
             let errorNumber = error["NSAppleScriptErrorNumber"] as? Int ?? 0
             if errorNumber != -600 && errorNumber != -1708 {  // Not running / not scriptable
-                print("[BrowserMonitor] AppleScript error: \(error)")
+                logger.error("AppleScript error: \(error)")
             }
             return nil
         }

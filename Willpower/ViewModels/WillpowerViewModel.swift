@@ -8,6 +8,9 @@
 import Foundation
 import WillpowerKit
 import AppKit
+import os.log
+
+private let logger = WillpowerLogger.viewModel
 
 /// Sidebar navigation categories
 enum SidebarCategory: String, CaseIterable, Identifiable {
@@ -120,9 +123,9 @@ final class WillpowerViewModel {
             // Report visit to daemon via IPC
             do {
                 try self.ipcManager.reportVisit(patternId: pattern.id, url: pattern.pattern)
-                print("[WillpowerViewModel] Reported visit for pattern: \(pattern.pattern)")
+                logger.debug("Reported visit for pattern: \(pattern.pattern)")
             } catch {
-                print("[WillpowerViewModel] Failed to report visit: \(error)")
+                logger.error("Failed to report visit: \(error.localizedDescription)")
             }
         }
     }
@@ -191,7 +194,7 @@ final class WillpowerViewModel {
             // Start monitoring
             await browserMonitor.startMonitoring()
             isBrowserMonitoringActive = await browserMonitor.isActive()
-            print("[WillpowerViewModel] Browser monitoring started")
+            logger.info("Browser monitoring started")
         }
     }
 
@@ -200,7 +203,7 @@ final class WillpowerViewModel {
         Task {
             await browserMonitor.stopMonitoring()
             isBrowserMonitoringActive = false
-            print("[WillpowerViewModel] Browser monitoring stopped")
+            logger.info("Browser monitoring stopped")
         }
     }
 
@@ -213,7 +216,7 @@ final class WillpowerViewModel {
         }
 
         await browserMonitor.setPatterns(patterns)
-        print("[WillpowerViewModel] Configured browser monitor with \(patterns.count) pattern(s)")
+        logger.debug("Configured browser monitor with \(patterns.count) pattern(s)")
     }
 
     /// Reconfigure browser monitor when blocklists change
@@ -353,7 +356,7 @@ final class WillpowerViewModel {
             // and overwrite our optimistic local update. The polling timer handles sync.
         } catch {
             // Log but don't show error to user - local state is saved
-            print("[WillpowerViewModel] IPC sync failed: \(error.localizedDescription)")
+            logger.error("IPC sync failed: \(error.localizedDescription)")
         }
     }
 
@@ -485,7 +488,7 @@ final class WillpowerViewModel {
             try ipcManager.deleteIndependentTrigger(triggerId: trigger.id)
             // Note: Don't call syncState() here - it would read stale daemon state
         } catch {
-            print("[WillpowerViewModel] IPC delete trigger failed: \(error.localizedDescription)")
+            logger.error("IPC delete trigger failed: \(error.localizedDescription)")
         }
 
         // Reconfigure browser monitor
@@ -505,7 +508,7 @@ final class WillpowerViewModel {
             // and overwrite our optimistic local update. The polling timer handles sync.
         } catch {
             // Log but don't show error to user - local state is saved
-            print("[WillpowerViewModel] IPC trigger sync failed: \(error.localizedDescription)")
+            logger.error("IPC trigger sync failed: \(error.localizedDescription)")
         }
     }
 

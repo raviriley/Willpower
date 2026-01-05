@@ -10,6 +10,9 @@ import ServiceManagement
 import WillpowerKit
 import AppKit
 import UniformTypeIdentifiers
+import os.log
+
+private let logger = WillpowerLogger.settings
 
 struct SettingsView: View {
     @Bindable var viewModel: WillpowerViewModel
@@ -212,7 +215,7 @@ struct SettingsView: View {
                 try SMAppService.mainApp.unregister()
             }
         } catch {
-            print("[Settings] Failed to set launch at login: \(error)")
+            logger.error("Failed to set launch at login: \(error.localizedDescription)")
             // Revert the toggle
             launchAtLogin = !enabled
         }

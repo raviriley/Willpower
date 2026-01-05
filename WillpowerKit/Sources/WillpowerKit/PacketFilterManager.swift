@@ -6,6 +6,9 @@
 //
 
 import Foundation
+import os.log
+
+private let logger = WillpowerLogger.packetFilter
 
 /// Manages pf (packet filter) firewall rules for blocking domains at the network level
 /// This provides more reliable blocking than hosts file alone, as it blocks TCP/UDP connections
@@ -87,14 +90,14 @@ public final class PacketFilterManager: Sendable {
 
         // Also resolve and block iCloud Private Relay infrastructure
         // This disables Private Relay so Safari respects our blocks
-        print("[PacketFilterManager] Blocking iCloud Private Relay to ensure Safari blocking works")
+        logger.info("Blocking iCloud Private Relay to ensure Safari blocking works")
         for relayDomain in Self.privateRelayDomains {
             let relayIPs = resolveHostname(relayDomain)
             allIPs.formUnion(relayIPs)
         }
 
         guard !allIPs.isEmpty else {
-            print("[PacketFilterManager] No IPs resolved for domains, skipping pf rules")
+            logger.warning("No IPs resolved for domains, skipping pf rules")
             return
         }
 
@@ -110,7 +113,7 @@ public final class PacketFilterManager: Sendable {
         // Enable pf and load rules
         try enablePF()
 
-        print("[PacketFilterManager] Started blocking \(allIPs.count) IPs for \(domains.count) domains (+ Private Relay)")
+        logger.info("Started blocking \(allIPs.count) IPs for \(domains.count) domains (+ Private Relay)")
     }
 
     /// Stop all Willpower pf blocking
@@ -125,7 +128,7 @@ public final class PacketFilterManager: Sendable {
         // Reload pf to apply empty rules
         try reloadAnchor()
 
-        print("[PacketFilterManager] Stopped pf blocking")
+        logger.info("Stopped pf blocking")
     }
 
     /// Check if Willpower pf rules are currently active
@@ -215,7 +218,7 @@ public final class PacketFilterManager: Sendable {
                 }
             }
         } catch {
-            print("[PacketFilterManager] dig failed for \(hostname): \(error)")
+            logger.debug("dig failed for \(hostname): \(error.localizedDescription)")
         }
 
         // Also resolve IPv6 addresses
@@ -242,13 +245,13 @@ public final class PacketFilterManager: Sendable {
                 }
             }
         } catch {
-            print("[PacketFilterManager] dig AAAA failed for \(hostname): \(error)")
+            logger.debug("dig AAAA failed for \(hostname): \(error.localizedDescription)")
         }
 
         if ips.isEmpty {
-            print("[PacketFilterManager] No IPs resolved for \(hostname)")
+            logger.debug("No IPs resolved for \(hostname)")
         } else {
-            print("[PacketFilterManager] Resolved \(hostname) -> \(ips)")
+            logger.debug("Resolved \(hostname) -> \(ips)")
         }
 
         return ips
@@ -332,7 +335,7 @@ public final class PacketFilterManager: Sendable {
         try process.run()
         process.waitUntilExit()
 
-        print("[PacketFilterManager] pf enabled and rules loaded (pfctl -E -f -F states)")
+        logger.info("pf enabled and rules loaded (pfctl -E -f -F states)")
     }
 
     /// Reload just our anchor (used when updating rules)

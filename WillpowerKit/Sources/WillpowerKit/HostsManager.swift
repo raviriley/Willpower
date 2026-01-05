@@ -6,6 +6,9 @@
 //
 
 import Foundation
+import os.log
+
+private let logger = WillpowerLogger.hosts
 
 /// Manages reading/writing to /etc/hosts with WILLPOWER markers
 public final class HostsManager: Sendable {
@@ -144,7 +147,7 @@ public final class HostsManager: Sendable {
         try? lookupdFlush.run()  // Only exists on very old macOS
         lookupdFlush.waitUntilExit()
 
-        print("[HostsManager] DNS cache flushed")
+        logger.info("DNS cache flushed")
     }
 
     /// Note about browser DNS caches
@@ -154,7 +157,7 @@ public final class HostsManager: Sendable {
         // Browser DNS caches are now bypassed by the PF firewall layer
         // which blocks TCP/UDP connections by IP address.
         // No AppKit/AppleScript needed - this runs safely in daemon context.
-        print("[HostsManager] Note: Browser DNS caches bypassed via PF firewall")
+        logger.debug("Browser DNS caches bypassed via PF firewall")
     }
 
     /// Convenience method to apply domains and flush DNS in one call

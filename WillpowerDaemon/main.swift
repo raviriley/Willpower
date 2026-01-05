@@ -3,35 +3,32 @@ import WillpowerKit
 
 // MARK: - Configuration
 
-private let daemonVersion = "1.0.2"  // Added tighter permissions
+private let daemonVersion = "1.0.3"  // Standardized logging with os_log
 private let runLoopInterval: TimeInterval = 5.0
 private let heartbeatInterval: TimeInterval = 5.0
 
-// MARK: - Stdout Flushing
+// MARK: - Logging
 
-/// Swift buffers stdout when redirected to a file. Force flush after important messages.
-func log(_ message: String) {
-    print(message)
-    fflush(stdout)
-}
+/// Unified daemon logger using os_log with stdout fallback for launchd
+private let log = DaemonLogger()
 
 // MARK: - Main Entry Point
 
-log("[WillpowerDaemon] Starting v\(daemonVersion)...")
-log("[WillpowerDaemon] PID: \(getpid()), UID: \(getuid())")
+log.info("Starting v\(daemonVersion)...")
+log.info("PID: \(getpid()), UID: \(getuid())")
 
 // Check if running as root (required for /etc/hosts modification)
 if getuid() != 0 {
-    log("[WillpowerDaemon] WARNING: Not running as root (UID: \(getuid()))")
-    log("[WillpowerDaemon] /etc/hosts modification will fail without root privileges")
-    log("[WillpowerDaemon] Run with sudo or install as LaunchDaemon")
+    log.warning("Not running as root (UID: \(getuid()))")
+    log.warning("/etc/hosts modification will fail without root privileges")
+    log.warning("Run with sudo or install as LaunchDaemon")
 }
 
 // MARK: - IPC Setup
 
 // Log the IPC directory being used
 // Using /Library/Application Support/Willpower/ipc - accessible by both root and user
-log("[WillpowerDaemon] IPC directory: \(IPCManager.ipcDirectory)")
+log.info("IPC directory: \(IPCManager.ipcDirectory)")
 
 let fm = FileManager.default
 
@@ -48,9 +45,9 @@ if !fm.fileExists(atPath: parentDir) {
         try fm.createDirectory(atPath: parentDir, withIntermediateDirectories: true)
         // 0o750: owner (root) rwx, group (admin) r-x, others ---
         try fm.setAttributes([.posixPermissions: 0o750, .groupOwnerAccountID: adminGroupID], ofItemAtPath: parentDir)
-        log("[WillpowerDaemon] Created parent directory: \(parentDir)")
+        log.info("Created parent directory: \(parentDir)")
     } catch {
-        print("[WillpowerDaemon] Failed to create parent directory: \(error)")
+        log.error("Failed to create parent directory: \(error)")
     }
 }
 
@@ -59,9 +56,9 @@ if !fm.fileExists(atPath: ipcDir) {
         try fm.createDirectory(atPath: ipcDir, withIntermediateDirectories: true)
         // 0o770: owner (root) rwx, group (admin) rwx, others ---
         try fm.setAttributes([.posixPermissions: 0o770, .groupOwnerAccountID: adminGroupID], ofItemAtPath: ipcDir)
-        log("[WillpowerDaemon] Created IPC directory: \(ipcDir)")
+        log.info("Created IPC directory: \(ipcDir)")
     } catch {
-        print("[WillpowerDaemon] Failed to create IPC directory: \(error)")
+        log.error("Failed to create IPC directory: \(error)")
     }
 }
 
@@ -82,19 +79,18 @@ var previousBlockedDomains: Set<String>? = nil
 
 // Check IPC availability
 guard ipcManager.isAvailable else {
-    print("[WillpowerDaemon] FATAL: App Groups not available")
-    print("[WillpowerDaemon] Ensure entitlements are configured correctly")
+    log.fault("IPC not available - ensure directory permissions are correct")
     exit(1)
 }
 
 // Load initial state or create default
 var state = ipcManager.loadStateOrDefault()
 state.daemonVersion = daemonVersion
-log("[WillpowerDaemon] Loaded state: \(state.blocklists.count) blocklists, \(state.activeBlocks.count) active blocks")
+log.info("Loaded state: \(state.blocklists.count) blocklists, \(state.activeBlocks.count) active blocks")
 
 // Start async operations
 Task {
-    log("[WillpowerDaemon] Initialized. Entering run loop...")
+    log.info("Initialized. Entering run loop...")
 
     // Main run loop
     var lastHeartbeat = Date()
@@ -135,7 +131,7 @@ Task {
             try ipcManager.saveState(state)
 
         } catch {
-            print("[WillpowerDaemon] Error in run loop: \(error)")
+            log.error("Error in run loop: \(error)")
         }
 
         // Sleep until next iteration
@@ -157,24 +153,24 @@ func processCommands(
 
     guard !commands.isEmpty else { return state }
 
-    print("[WillpowerDaemon] Processing \(commands.count) command(s)")
+    log.info("Processing \(commands.count) command(s)")
 
     for wrapper in commands {
         // Skip stale commands older than 30 seconds to prevent replay of old commands
         let commandAge = Date().timeIntervalSince(wrapper.timestamp)
         if commandAge > 30 {
-            print("[WillpowerDaemon] SKIPPED: Stale command (age: \(Int(commandAge))s) - \(wrapper.command)")
+            log.debug("SKIPPED: Stale command (age: \(Int(commandAge))s) - \(wrapper.command)")
             try ipcManager.markCommandProcessed(wrapper.id)
             continue
         }
 
-        print("[WillpowerDaemon] Command: \(wrapper.command)")
+        log.debug("Command: \(wrapper.command)")
 
         switch wrapper.command {
         case .activateBlocklist(let blocklistId, let trigger, let isLocked):
             // VALIDATE: Only activate if blocklist exists in current state
             guard mutableState.blocklists.contains(where: { $0.id == blocklistId }) else {
-                print("[WillpowerDaemon] SKIPPED: activateBlocklist for non-existent blocklist \(blocklistId)")
+                log.warning("SKIPPED: activateBlocklist for non-existent blocklist \(blocklistId)")
                 break
             }
             mutableState = activateBlocklist(
@@ -191,7 +187,7 @@ func processCommands(
             // GUARD: Don't process empty updates if we have existing data
             // This prevents race conditions from clearing state
             if blocklists.isEmpty && !mutableState.blocklists.isEmpty {
-                print("[WillpowerDaemon] SKIPPED: updateBlocklists with empty array (preserving existing \(mutableState.blocklists.count) blocklists)")
+                log.debug("SKIPPED: updateBlocklists with empty array (preserving existing \(mutableState.blocklists.count) blocklists)")
                 break
             }
 
@@ -209,7 +205,7 @@ func processCommands(
             }
 
             if !orphanedBlocks.isEmpty {
-                print("[WillpowerDaemon] Cleaning up \(orphanedBlocks.count) orphaned active block(s)")
+                log.info("Cleaning up \(orphanedBlocks.count) orphaned active block(s)")
                 mutableState.activeBlocks.removeAll { block in
                     guard block.reason != .visitCountTrigger else { return false }
                     return !validBlocklistIds.contains(block.blocklistId)
@@ -225,7 +221,7 @@ func processCommands(
                     let newDomains = updatedDomains.subtracting(currentDomains)
 
                     if !newDomains.isEmpty {
-                        print("[WillpowerDaemon] Adding \(newDomains.count) new domain(s) to active block for '\(updatedBlocklist.name)'")
+                        log.info("Adding \(newDomains.count) new domain(s) to active block for '\(updatedBlocklist.name)'")
                         mutableState.activeBlocks[blockIdx].domains.append(contentsOf: newDomains)
                     }
                 }
@@ -238,7 +234,7 @@ func processCommands(
             // Visit reported from app (which runs BrowserMonitor)
             if let idx = mutableState.visitRecords.firstIndex(where: { $0.patternId == patternId }) {
                 mutableState.visitRecords[idx].recordVisit()
-                print("[WillpowerDaemon] Visit recorded for pattern \(patternId): count=\(mutableState.visitRecords[idx].visitCount)")
+                log.debug("Visit recorded for pattern \(patternId): count=\(mutableState.visitRecords[idx].visitCount)")
             } else {
                 // Create new visit record if it doesn't exist
                 // Find the pattern string from independent triggers first
@@ -264,25 +260,25 @@ func processCommands(
                 var record = VisitRecord(patternId: patternId, pattern: patternString)
                 record.recordVisit()
                 mutableState.visitRecords.append(record)
-                print("[WillpowerDaemon] New visit record created for pattern \(patternId)")
+                log.debug("New visit record created for pattern \(patternId)")
             }
             mutableState.lastUpdated = Date()
 
         case .updateIndependentTriggers(let triggers):
             // GUARD: Don't process empty updates if we have existing data
             if triggers.isEmpty && !mutableState.independentTriggers.isEmpty {
-                print("[WillpowerDaemon] SKIPPED: updateIndependentTriggers with empty array (preserving existing \(mutableState.independentTriggers.count) triggers)")
+                log.debug("SKIPPED: updateIndependentTriggers with empty array (preserving existing \(mutableState.independentTriggers.count) triggers)")
                 break
             }
             mutableState.independentTriggers = triggers
             mutableState.lastUpdated = Date()
-            print("[WillpowerDaemon] Updated independent triggers: \(triggers.count) trigger(s)")
+            log.info("Updated independent triggers: \(triggers.count) trigger(s)")
 
         case .deleteIndependentTrigger(let triggerId):
             let beforeCount = mutableState.independentTriggers.count
             mutableState.independentTriggers.removeAll { $0.id == triggerId }
             if beforeCount > mutableState.independentTriggers.count {
-                print("[WillpowerDaemon] Deleted independent trigger \(triggerId)")
+                log.info("Deleted independent trigger \(triggerId)")
             }
             mutableState.lastUpdated = Date()
         }
@@ -304,7 +300,7 @@ func activateBlocklist(
     var mutableState = state
 
     guard let blocklistIdx = mutableState.blocklists.firstIndex(where: { $0.id == blocklistId }) else {
-        print("[WillpowerDaemon] Blocklist not found: \(blocklistId)")
+        log.warning("Blocklist not found: \(blocklistId)")
         return state
     }
 
@@ -313,7 +309,7 @@ func activateBlocklist(
     // Check if already has an active locked block
     if let existingBlock = mutableState.activeBlocks.first(where: { $0.blocklistId == blocklistId }),
        existingBlock.isLocked && !existingBlock.isExpired {
-        print("[WillpowerDaemon] Blocklist already has active locked block until \(existingBlock.expiresAt?.description ?? "indefinite")")
+        log.debug("Blocklist already has active locked block until \(existingBlock.expiresAt?.description ?? "indefinite")")
         return state
     }
 
@@ -362,7 +358,7 @@ func activateBlocklist(
     mutableState.blocklists[blocklistIdx].isActive = true
     mutableState.lastUpdated = Date()
 
-    print("[WillpowerDaemon] Activated blocklist '\(blocklist.name)' - locked: \(isLocked), expires: \(expiresAt?.description ?? "indefinite")")
+    log.info("Activated blocklist '\(blocklist.name)' - locked: \(isLocked), expires: \(expiresAt?.description ?? "indefinite")")
 
     return mutableState
 }
@@ -373,8 +369,8 @@ func deactivateBlocklist(_ blocklistId: UUID, state: WillpowerState) -> Willpowe
     // Check if there's a locked block that hasn't expired
     if let block = mutableState.activeBlocks.first(where: { $0.blocklistId == blocklistId }),
        block.isLocked && !block.isExpired {
-        print("[WillpowerDaemon] REJECTED: Cannot deactivate locked blocklist until \(block.expiresAt?.description ?? "indefinite")")
-        print("[WillpowerDaemon] This is the 'willpower' in Willpower - blocks cannot be bypassed!")
+        log.warning("REJECTED: Cannot deactivate locked blocklist until \(block.expiresAt?.description ?? "indefinite")")
+        log.info("This is the 'willpower' in Willpower - blocks cannot be bypassed!")
         return state  // REJECT the deactivation
     }
 
@@ -384,7 +380,7 @@ func deactivateBlocklist(_ blocklistId: UUID, state: WillpowerState) -> Willpowe
     // Mark blocklist as inactive
     if let idx = mutableState.blocklists.firstIndex(where: { $0.id == blocklistId }) {
         mutableState.blocklists[idx].isActive = false
-        print("[WillpowerDaemon] Deactivated blocklist '\(mutableState.blocklists[idx].name)'")
+        log.info("Deactivated blocklist '\(mutableState.blocklists[idx].name)'")
     }
 
     mutableState.lastUpdated = Date()
@@ -425,7 +421,7 @@ func evaluateTriggers(
                 }
 
                 if existingScheduleBlock == nil {
-                    print("[WillpowerDaemon] Schedule window active for '\(blocklist.name)'")
+                    log.info("Schedule window active for '\(blocklist.name)'")
 
                     let block = ActiveBlock(
                         blocklistId: blocklist.id,
@@ -481,7 +477,7 @@ func evaluateIndependentTriggers(state: WillpowerState) -> WillpowerState {
             switch pattern.blockAction {
             case .blockDomain:
                 // Block just the pattern's associated domain
-                print("[WillpowerDaemon] Visit threshold exceeded - blocking domain '\(pattern.associatedDomain)'")
+                log.info("Visit threshold exceeded - blocking domain '\(pattern.associatedDomain)'")
 
                 let block = ActiveBlock(
                     blocklistId: pattern.id,  // Use pattern ID to track this specific block
@@ -503,7 +499,7 @@ func evaluateIndependentTriggers(state: WillpowerState) -> WillpowerState {
                     }
 
                     if existingBlocklistBlock == nil {
-                        print("[WillpowerDaemon] Visit threshold exceeded - activating blocklist '\(blocklist.name)'")
+                        log.info("Visit threshold exceeded - activating blocklist '\(blocklist.name)'")
 
                         let block = ActiveBlock(
                             blocklistId: blocklistId,
@@ -523,7 +519,7 @@ func evaluateIndependentTriggers(state: WillpowerState) -> WillpowerState {
                         mutableState.lastUpdated = Date()
                     }
                 } else {
-                    print("[WillpowerDaemon] WARNING: Blocklist \(blocklistId) not found for trigger activation")
+                    log.warning("Blocklist \(blocklistId) not found for trigger activation")
                 }
             }
         }
@@ -546,7 +542,7 @@ func cleanupExpiredBlocks(state: WillpowerState) -> WillpowerState {
     let expiredBlocks = mutableState.activeBlocks.filter { $0.isExpired }
 
     if !expiredBlocks.isEmpty {
-        print("[WillpowerDaemon] Cleaning up \(expiredBlocks.count) expired block(s)")
+        log.info("Cleaning up \(expiredBlocks.count) expired block(s)")
 
         for block in expiredBlocks {
             // Mark blocklist as inactive if no other active blocks
@@ -588,31 +584,31 @@ func applyBlocks(
         return  // No change, skip updates
     }
 
-    log("[WillpowerDaemon] Block state changed. Now blocking \(allDomains.count) domain(s)")
+    log.info("Block state changed. Now blocking \(allDomains.count) domain(s)")
 
     // LAYER 1: Hosts file blocking
     do {
         try hostsManager.applyBlocklistAndFlush(domains: Array(allDomains))
-        print("[WillpowerDaemon] ✓ Layer 1: Hosts file updated")
+        log.info("Layer 1: Hosts file updated")
     } catch HostsManager.HostsError.permissionDenied {
-        print("[WillpowerDaemon] ✗ Layer 1: Hosts file - permission denied (not running as root)")
+        log.error("Layer 1: Hosts file - permission denied (not running as root)")
     } catch {
-        print("[WillpowerDaemon] ✗ Layer 1: Hosts file error - \(error)")
+        log.error("Layer 1: Hosts file error - \(error)")
     }
 
     // LAYER 2: PF firewall blocking (network-level, bypasses browser DNS cache)
     do {
         if allDomains.isEmpty {
             try packetFilterManager.stopBlock()
-            print("[WillpowerDaemon] ✓ Layer 2: PF firewall rules cleared")
+            log.info("Layer 2: PF firewall rules cleared")
         } else {
             try packetFilterManager.startBlock(domains: Array(allDomains))
-            print("[WillpowerDaemon] ✓ Layer 2: PF firewall rules applied")
+            log.info("Layer 2: PF firewall rules applied")
         }
     } catch PacketFilterManager.PFError.permissionDenied {
-        print("[WillpowerDaemon] ✗ Layer 2: PF firewall - permission denied (not running as root)")
+        log.error("Layer 2: PF firewall - permission denied (not running as root)")
     } catch {
-        print("[WillpowerDaemon] ✗ Layer 2: PF firewall error - \(error)")
+        log.error("Layer 2: PF firewall error - \(error)")
     }
 
     // Update tracking

@@ -464,7 +464,7 @@ The "toggle in System Settings" UX is less beneficial for tamper resistance - it
 2. **First-time schedule evaluation** - May take up to 5 seconds for schedule to activate on creation
 3. **App Groups entitlement** - Currently unused but entitlement remains in project
 4. **No state backup** - Risk of configuration loss if state.json becomes corrupted
-5. **Mixed logging** - Inconsistent use of print() vs os_log across codebase
+5. ~~**Mixed logging**~~ - **FIXED**: Unified WillpowerLogger with os_log across entire codebase
 
 ---
 
