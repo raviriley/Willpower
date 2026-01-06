@@ -168,6 +168,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard iconUpdateTimer == nil else { return }
 
         iconUpdateTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            guard let self else { return }
             Task { @MainActor [weak self] in
                 self?.updateMenuBarIcon()
                 self?.updateStatusMenuItem()
