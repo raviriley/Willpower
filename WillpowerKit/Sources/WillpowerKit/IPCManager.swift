@@ -395,14 +395,6 @@ public final class IPCManager: @unchecked Sendable {
 
     // MARK: - Debug
 
-    /// Clear all IPC data (for testing/debugging only)
-    public func clearAllData() {
-        try? fileManager.removeItem(atPath: Self.stateFile)
-        try? fileManager.removeItem(atPath: Self.stateBackupFile)
-        try? fileManager.removeItem(atPath: Self.commandsFile)
-        try? fileManager.removeItem(atPath: Self.heartbeatFile)
-    }
-
     /// Get debug description of current IPC state
     public func debugDescription() -> String {
         var lines: [String] = []

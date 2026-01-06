@@ -7,7 +7,6 @@
 
 import Foundation
 import AppKit
-import os.log
 
 private let logger = WillpowerLogger.browser
 
@@ -138,9 +137,6 @@ public actor BrowserMonitor {
     /// Callback when a pattern match is detected
     public var onPatternMatch: (@Sendable (URLPattern, VisitRecord) async -> Void)?
 
-    /// Callback when a threshold is exceeded
-    public var onThresholdExceeded: (@Sendable (URLPattern, VisitRecord, Int) async -> Void)?
-
     // MARK: - Initialization
 
     public init() {}
@@ -150,11 +146,6 @@ public actor BrowserMonitor {
     /// Set the callback for pattern matches (must be called from within actor context)
     public func setOnPatternMatch(_ callback: (@Sendable (URLPattern, VisitRecord) async -> Void)?) {
         self.onPatternMatch = callback
-    }
-
-    /// Set the callback for threshold exceeded (must be called from within actor context)
-    public func setOnThresholdExceeded(_ callback: (@Sendable (URLPattern, VisitRecord, Int) async -> Void)?) {
-        self.onThresholdExceeded = callback
     }
 
     // MARK: - Configuration

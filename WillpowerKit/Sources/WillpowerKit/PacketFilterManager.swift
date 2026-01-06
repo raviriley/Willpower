@@ -155,37 +155,6 @@ public final class PacketFilterManager: Sendable {
         }
     }
 
-    /// Get the IPs currently blocked by pf
-    public func getBlockedIPs() -> [String] {
-        let process = Process()
-        let pipe = Pipe()
-
-        process.executableURL = URL(fileURLWithPath: "/sbin/pfctl")
-        process.arguments = ["-a", Self.anchorName, "-sr"]
-        process.standardOutput = pipe
-        process.standardError = FileHandle.nullDevice
-
-        do {
-            try process.run()
-            process.waitUntilExit()
-
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            let output = String(data: data, encoding: .utf8) ?? ""
-
-            // Parse IPs from rules like "block return out proto tcp from any to 1.2.3.4"
-            var ips = Set<String>()
-            for line in output.components(separatedBy: .newlines) {
-                if let range = line.range(of: "to ([0-9.]+|[0-9a-f:]+)", options: .regularExpression) {
-                    let ipPart = String(line[range]).replacingOccurrences(of: "to ", with: "")
-                    ips.insert(ipPart)
-                }
-            }
-            return Array(ips)
-        } catch {
-            return []
-        }
-    }
-
     // MARK: - Private Helpers
 
     /// Resolve a hostname to IP addresses using external DNS (bypasses hosts file)

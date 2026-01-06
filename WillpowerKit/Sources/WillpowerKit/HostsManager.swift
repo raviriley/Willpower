@@ -150,21 +150,10 @@ public final class HostsManager: Sendable {
         logger.info("DNS cache flushed")
     }
 
-    /// Note about browser DNS caches
-    /// Browser DNS caches are handled by the PF firewall layer which blocks
-    /// at the network level regardless of cached DNS entries.
-    public func attemptBrowserDNSFlush() {
-        // Browser DNS caches are now bypassed by the PF firewall layer
-        // which blocks TCP/UDP connections by IP address.
-        // No AppKit/AppleScript needed - this runs safely in daemon context.
-        logger.debug("Browser DNS caches bypassed via PF firewall")
-    }
-
     /// Convenience method to apply domains and flush DNS in one call
     public func applyBlocklistAndFlush(domains: [String]) throws {
         try applyBlocklist(domains: domains)
         try flushDNSCache()
-        attemptBrowserDNSFlush()
     }
 
     // MARK: - Private Helpers
@@ -322,35 +311,3 @@ public final class HostsManager: Sendable {
     }
 }
 
-// MARK: - Convenience Extensions
-
-extension HostsManager {
-    /// Check if a specific domain is currently blocked
-    public func isDomainBlocked(_ domain: String) throws -> Bool {
-        let managedDomains = try readManagedDomains()
-        let normalizedDomain = domain.lowercased()
-        let normalizedWithWWW = "www.\(normalizedDomain)"
-
-        return managedDomains.contains { managed in
-            managed == normalizedDomain || managed == normalizedWithWWW
-        }
-    }
-
-    /// Get a formatted string of all blocked domains (for debugging)
-    public func getBlockedDomainsDescription() throws -> String {
-        let domains = try readManagedDomains()
-        if domains.isEmpty {
-            return "No domains currently blocked by Willpower"
-        }
-
-        // Filter to unique base domains (remove duplicates from www variants)
-        let baseDomains = Set(domains.map { domain -> String in
-            if domain.hasPrefix("www.") {
-                return String(domain.dropFirst(4))
-            }
-            return domain
-        }).sorted()
-
-        return "Blocked domains (\(baseDomains.count)):\n" + baseDomains.map { "  - \($0)" }.joined(separator: "\n")
-    }
-}
