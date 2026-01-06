@@ -31,24 +31,14 @@ struct DaemonSetupView: View {
                 .padding(.horizontal)
 
             // Status indicator
-            HStack(spacing: 8) {
-                Circle()
-                    .fill(statusColor)
-                    .frame(width: 10, height: 10)
-                Text(daemonManager.statusDescription)
-                    .font(.headline)
-            }
-            .padding(.vertical, 8)
-            .padding(.horizontal, 16)
-            .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+            DaemonStatusIndicatorView(
+                status: daemonManager.status,
+                statusDescription: daemonManager.statusDescription
+            )
 
             // Error message
             if let error = daemonManager.lastError {
-                Label(error, systemImage: "exclamationmark.triangle")
-                    .foregroundStyle(.red)
-                    .font(.callout)
-                    .padding()
-                    .background(.red.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
+                DaemonErrorMessageView(error: error)
             }
 
             // Action buttons based on status
@@ -56,62 +46,13 @@ struct DaemonSetupView: View {
 
             // Help text
             if daemonManager.needsApproval {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("After clicking 'Open System Settings':")
-                        .font(.callout)
-                        .fontWeight(.medium)
-
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack(alignment: .top, spacing: 8) {
-                            Text("1.")
-                                .fontWeight(.semibold)
-                                .frame(width: 20, alignment: .trailing)
-                            Text("Go to **General** > **Login Items**")
-                        }
-                        HStack(alignment: .top, spacing: 8) {
-                            Text("2.")
-                                .fontWeight(.semibold)
-                                .frame(width: 20, alignment: .trailing)
-                            Text("Find **Willpower** under 'Allow in the Background'")
-                        }
-                        HStack(alignment: .top, spacing: 8) {
-                            Text("3.")
-                                .fontWeight(.semibold)
-                                .frame(width: 20, alignment: .trailing)
-                            Text("Toggle it **ON**")
-                        }
-                        HStack(alignment: .top, spacing: 8) {
-                            Text("4.")
-                                .fontWeight(.semibold)
-                                .frame(width: 20, alignment: .trailing)
-                            Text("Click **Refresh Status**")
-                        }
-                    }
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                }
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+                DaemonApprovalInstructionsView(maxWidth: .infinity)
             }
         }
         .padding(32)
         .frame(width: 450, height: 500)
         .onAppear {
             daemonManager.refreshStatus()
-        }
-    }
-
-    private var statusColor: Color {
-        switch daemonManager.status {
-        case .enabled:
-            return .green
-        case .requiresApproval:
-            return .orange
-        case .notRegistered, .notFound:
-            return .red
-        @unknown default:
-            return .gray
         }
     }
 
