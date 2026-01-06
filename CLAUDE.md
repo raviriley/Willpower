@@ -86,7 +86,7 @@ Key completed features:
 
 ## Build Configuration
 
-- **Deployment Target**: macOS 15.6
+- **Deployment Target**: macOS 14.0
 - **Swift**: 6.2 (tools version), compiled with Swift 6.2.3
 - **Architecture**: arm64
 - App Sandbox enabled for main app
