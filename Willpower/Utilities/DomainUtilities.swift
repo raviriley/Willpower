@@ -11,7 +11,7 @@ import Foundation
 /// - Parameter input: Raw domain or URL string
 /// - Returns: Cleaned domain (e.g., "twitter.com")
 func cleanDomain(_ input: String) -> String {
-    var cleaned = input.lowercased().trimmingCharacters(in: .whitespaces)
+    var cleaned: String = input.lowercased().trimmingCharacters(in: .whitespaces)
     if cleaned.hasPrefix("http://") { cleaned = String(cleaned.dropFirst(7)) }
     if cleaned.hasPrefix("https://") { cleaned = String(cleaned.dropFirst(8)) }
     if cleaned.hasPrefix("www.") { cleaned = String(cleaned.dropFirst(4)) }

@@ -127,9 +127,9 @@ final class WillpowerViewModel {
             // Report visit to daemon via IPC
             do {
                 try self.ipcManager.reportVisit(patternId: pattern.id, url: pattern.pattern)
-                logger.debug("Reported visit for pattern: \(pattern.pattern)")
+                await logger.debug("Reported visit for pattern: \(pattern.pattern)")
             } catch {
-                logger.error("Failed to report visit: \(error.localizedDescription)")
+                await logger.error("Failed to report visit: \(error.localizedDescription)")
             }
         }
     }
