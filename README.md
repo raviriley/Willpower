@@ -1,114 +1,25 @@
 # Willpower
 
-A macOS website blocker that uses `/etc/hosts` manipulation via a privileged daemon. Modern Swift replacement inspired by [SelfControl](https://github.com/SelfControlApp/selfcontrol).
+Willpower is a macOS app that gives you the willpower to resist distractions and focus on what matters. Simply add sites to a blocklist and click "Activate Now" to start blocking them.
 
-## Features
+You can also set up scheduled blocking sessions, create blocklists for different contexts, and configure visit-count triggers that automatically restrict access after you've visited a site too many times.
 
-- Block websites via /etc/hosts manipulation
-- PF (packet filter) firewall for network-level blocking
-- Browser URL monitoring for visit-count triggers (supports Safari, Chrome, Firefox, Arc, Brave, Edge)
-- Schedule-based and manual activation
-- Unbreakable blocking with daemon enforcement ("willpower")
-- Blocklist presets for common categories (social media, news, streaming, gaming)
-
-## Requirements
-
-- macOS 15.6+
-- Apple Silicon (arm64)
-- Xcode 16+ (for building)
+Willpower is free and open source. Inspired by [SelfControl](https://github.com/SelfControlApp/selfcontrol).
 
 ## Installation
 
-### Build from Source
+Go to the latest [release](https://github.com/raviriley/Willpower/releases/latest) and download the DMG file. Open the DMG file and drag the Willpower app to your Applications folder.
 
-1. Clone the repository
-2. Open `Willpower.xcodeproj` in Xcode
-3. Select the `Willpower` scheme
-4. Build and Run (Cmd+R)
+Compatible with macOS 14 and later.
 
-### First Launch
+## Features
 
-1. Complete the onboarding flow
-2. Approve daemon in **System Settings > General > Login Items**
-3. Grant Automation permission when prompted (for browser URL monitoring)
+- Schedule-based and manual activation of blocklists
+- Browser URL monitoring for visit-count triggers (supports Safari, Chrome, Firefox, Arc, Brave, Edge)
+- Unbreakable blocking: you won't be able to access blocked sites even if you restart your computer or delete the app.
+- Blocklist presets for common categories (social media, news, streaming, gaming)
 
-## Architecture
-
-```
-Willpower/
-├── WillpowerApp.swift          # App entry point
-├── ContentView.swift           # Main navigation structure
-├── DaemonManager.swift         # LaunchDaemon registration
-├── ViewModels/
-│   └── WillpowerViewModel.swift  # Central state & IPC
-└── Views/
-    ├── SidebarView.swift
-    ├── Status/                 # Dashboard views
-    ├── Blocklists/             # CRUD + activation
-    ├── Schedules/              # Time-based automation
-    ├── Triggers/               # Visit-count automation
-    └── Components/             # Reusable UI
-
-WillpowerDaemon/
-├── main.swift                  # Run loop & command processing
-└── raviriley.WillpowerDaemon.plist
-
-WillpowerKit/
-└── Sources/WillpowerKit/
-    ├── Models.swift            # BlocklistConfig, TriggerConfig, etc.
-    ├── IPCManager.swift        # File-based IPC
-    ├── HostsManager.swift      # /etc/hosts manipulation
-    ├── PacketFilterManager.swift # PF firewall rules
-    ├── BrowserMonitor.swift    # URL polling
-    └── TriggerEvaluator.swift  # Schedule/visit evaluation
-```
-
-### Privilege Separation
-
-- **Willpower/** - Sandboxed SwiftUI app (UI/configuration)
-- **WillpowerDaemon/** - Root daemon (enforces blocking via SMAppService.daemon)
-- **WillpowerKit/** - Shared Swift package (models, blocking logic)
-
-### IPC Flow
-
-```
-[App] → /Library/Application Support/Willpower/ipc/commands.json → [Daemon]
-[Daemon] → /Library/Application Support/Willpower/ipc/state.json → [App]
-[Daemon] → /Library/Application Support/Willpower/ipc/heartbeat → [App] (liveness check)
-```
-
-### Key Behaviors
-
-#### Locked Blocks
-When a blocklist is activated with `isLocked: true`, it cannot be deactivated until expiration. This is the "willpower" in Willpower - users can't bypass their own blocks.
-
-#### Add-Only Domain Editing
-Active blocklists can have domains added (immediately blocked), but existing domains cannot be removed until the block expires. Prevents circumventing blocks by deleting domains.
-
-#### Schedule Activation
-Daemon evaluates schedule triggers every 5 seconds. When the current time falls within a schedule window, the blocklist activates. Schedule blocks expire when the window ends.
-
-#### Visit-Count Triggers
-BrowserMonitor polls active browser URLs (via AppleScript). When visits to a URL pattern exceed the configured threshold, the blocklist activates for the configured duration.
-
-## Development
-
-- See `CHANGELOG.md` for current TODOs
-- See `XPC_TODO.md` for planned XPC migration
-- See `CLAUDE.md` for codebase guidance
-
-### Build Commands
-
-```bash
-# Build in Xcode
-# Select scheme (Willpower or WillpowerDaemon) then Cmd+B
-
-# Build WillpowerKit package
-cd WillpowerKit && swift build
-
-# Run tests (when implemented)
-cd WillpowerKit && swift test
-```
+See [DEVELOPMENT.md](DEVELOPMENT.md) for instructions on building from source and development details.
 
 ## License
 
