@@ -15,7 +15,6 @@ struct TriggerListView: View {
     @State private var isShowingDeleteConfirmation = false
 
     var body: some View {
-        let _ = handlePendingNavigation()
         List(selection: $viewModel.selectedTriggerId) {
             ForEach(viewModel.independentTriggers) { trigger in
                 TriggerRowView(trigger: trigger, viewModel: viewModel)
@@ -36,6 +35,9 @@ struct TriggerListView: View {
         }
         .listStyle(.inset)
         .navigationTitle("Triggers")
+        .task {
+            handlePendingNavigation()
+        }
         .toolbar {
             ToolbarItem {
                 Button {

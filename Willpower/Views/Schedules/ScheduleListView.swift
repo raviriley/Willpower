@@ -12,7 +12,6 @@ struct ScheduleListView: View {
     @Bindable var viewModel: WillpowerViewModel
 
     var body: some View {
-        let _ = handlePendingNavigation()
         List(selection: Binding(
             get: {
                 if let ids = viewModel.selectedScheduleId {
@@ -56,6 +55,9 @@ struct ScheduleListView: View {
         }
         .listStyle(.inset)
         .navigationTitle("Schedules")
+        .task {
+            handlePendingNavigation()
+        }
         .toolbar {
             ToolbarItem {
                 Menu {
