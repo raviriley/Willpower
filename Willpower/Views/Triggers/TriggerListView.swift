@@ -150,7 +150,7 @@ struct TriggerRowView: View {
                 HStack(spacing: 6) {
                     Text("\(totalVisits)/\(trigger.maxVisits) visits")
                         .font(.caption)
-                        .foregroundStyle(visitCountColor(totalVisits, max: trigger.maxVisits))
+                        .foregroundStyle(visitCountColor(current: totalVisits, max: trigger.maxVisits))
                     
                     Text("→")
                         .font(.caption)
@@ -171,32 +171,6 @@ struct TriggerRowView: View {
             Spacer()
         }
         .padding(.vertical, 4)
-    }
-
-    private func visitCountColor(_ count: Int, max: Int) -> Color {
-        let ratio = Double(count) / Double(max)
-        if ratio >= 1.0 {
-            return .red
-        } else if ratio >= 0.7 {
-            return .orange
-        } else if ratio >= 0.4 {
-            return .yellow
-        } else {
-            return .green
-        }
-    }
-
-    private func formatDuration(_ seconds: Int) -> String {
-        let hours = seconds / 3600
-        let minutes = (seconds % 3600) / 60
-
-        if hours > 0 && minutes > 0 {
-            return "\(hours)h \(minutes)m"
-        } else if hours > 0 {
-            return "\(hours) hour\(hours == 1 ? "" : "s")"
-        } else {
-            return "\(minutes) minute\(minutes == 1 ? "" : "s")"
-        }
     }
 }
 
