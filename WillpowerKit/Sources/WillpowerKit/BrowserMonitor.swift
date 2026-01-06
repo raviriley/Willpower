@@ -206,11 +206,11 @@ public actor BrowserMonitor {
         guard !isMonitoring else { return }
         isMonitoring = true
 
-        monitoringTask = Task { [weak self] in
+        monitoringTask = Task {
             while !Task.isCancelled {
-                await self?.pollBrowsers()
+                await self.pollBrowsers()
 
-                let interval = await self?.pollingInterval ?? 3.0
+                let interval = self.pollingInterval
                 try? await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
             }
         }
