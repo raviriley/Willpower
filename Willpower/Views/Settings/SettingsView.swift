@@ -113,6 +113,17 @@ struct SettingsView: View {
 
             // MARK: - About Section
             Section {
+                Link(destination: URL(string: "https://x.com/ravi_riley")!) {
+                    HStack {
+                        Label("Created by Ravi Riley", systemImage: "person.fill")
+                        Spacer()
+                        Image(systemName: "arrow.up.right")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .buttonStyle(.borderless)
+
                 HStack {
                     Label("App Version", systemImage: "info.circle")
                     Spacer()
