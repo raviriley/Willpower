@@ -12,6 +12,8 @@ Go to the latest [release](https://github.com/raviriley/Willpower/releases/lates
 
 Compatible with macOS 14 and later.
 
+<img width="1112" height="827" alt="Screenshot 2026-01-06 at 6 52 58 PM" src="https://github.com/user-attachments/assets/de445452-e6f1-4f42-80c2-e030717eb235" />
+
 ## Features
 
 - Schedule-based and manual activation of blocklists
