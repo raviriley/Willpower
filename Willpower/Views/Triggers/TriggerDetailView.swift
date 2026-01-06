@@ -66,7 +66,7 @@ struct TriggerDetailView: View {
                             Text("Visit Count")
                             Spacer()
                             Text("\(totalVisits)/\(maxVisits)")
-                                .foregroundStyle(visitCountColor)
+                                .foregroundStyle(visitCountColor(current: totalVisits, max: maxVisits))
                         }
 
                         if isTriggerActive {
@@ -222,19 +222,6 @@ struct TriggerDetailView: View {
         }
     }
 
-    private var visitCountColor: Color {
-        let ratio = Double(totalVisits) / Double(maxVisits)
-        if ratio >= 1.0 {
-            return .red
-        } else if ratio >= 0.7 {
-            return .orange
-        } else if ratio >= 0.4 {
-            return .yellow
-        } else {
-            return .green
-        }
-    }
-
     private func loadTriggerData() {
         if let trigger {
             triggerName = trigger.name
@@ -333,23 +320,6 @@ struct TriggerDetailView: View {
         }
     }
 
-    private func extractDomain(from pattern: String) -> String {
-        var domain = pattern.lowercased()
-        if domain.hasPrefix("http://") { domain = String(domain.dropFirst(7)) }
-        if domain.hasPrefix("https://") { domain = String(domain.dropFirst(8)) }
-        if domain.hasPrefix("www.") { domain = String(domain.dropFirst(4)) }
-        if let slash = domain.firstIndex(of: "/") { domain = String(domain[..<slash]) }
-        return domain
-    }
-
-    private func cleanURLPattern(_ input: String) -> String {
-        var cleaned = input.lowercased().trimmingCharacters(in: .whitespaces)
-        if cleaned.hasPrefix("http://") { cleaned = String(cleaned.dropFirst(7)) }
-        if cleaned.hasPrefix("https://") { cleaned = String(cleaned.dropFirst(8)) }
-        if cleaned.hasPrefix("www.") { cleaned = String(cleaned.dropFirst(4)) }
-        return cleaned
-    }
-
     private func validateURLPattern(_ pattern: String) -> String? {
         if pattern.contains(" ") {
             return "URL pattern cannot contain spaces"
@@ -391,19 +361,6 @@ struct TriggerDetailView: View {
         }
 
         return nil
-    }
-
-    private func formatDuration(_ seconds: Int) -> String {
-        let hours = seconds / 3600
-        let minutes = (seconds % 3600) / 60
-
-        if hours > 0 && minutes > 0 {
-            return "\(hours)h \(minutes)m"
-        } else if hours > 0 {
-            return "\(hours) hour\(hours == 1 ? "" : "s")"
-        } else {
-            return "\(minutes) minute\(minutes == 1 ? "" : "s")"
-        }
     }
 }
 

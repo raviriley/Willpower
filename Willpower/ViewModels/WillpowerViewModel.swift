@@ -642,16 +642,6 @@ final class WillpowerViewModel {
 
     // MARK: - Helpers
 
-    /// Clean a domain string
-    private func cleanDomain(_ input: String) -> String {
-        var cleaned = input.lowercased().trimmingCharacters(in: .whitespaces)
-        if cleaned.hasPrefix("http://") { cleaned = String(cleaned.dropFirst(7)) }
-        if cleaned.hasPrefix("https://") { cleaned = String(cleaned.dropFirst(8)) }
-        if cleaned.hasPrefix("www.") { cleaned = String(cleaned.dropFirst(4)) }
-        if let slash = cleaned.firstIndex(of: "/") { cleaned = String(cleaned[..<slash]) }
-        return cleaned
-    }
-
     /// Clear error message
     func clearError() {
         errorMessage = nil

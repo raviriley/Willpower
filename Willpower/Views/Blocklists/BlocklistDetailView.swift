@@ -466,15 +466,6 @@ struct BlocklistDetailView: View {
         saveIfValid()
     }
 
-    private func cleanDomain(_ input: String) -> String {
-        var cleaned = input.lowercased().trimmingCharacters(in: .whitespaces)
-        if cleaned.hasPrefix("http://") { cleaned = String(cleaned.dropFirst(7)) }
-        if cleaned.hasPrefix("https://") { cleaned = String(cleaned.dropFirst(8)) }
-        if cleaned.hasPrefix("www.") { cleaned = String(cleaned.dropFirst(4)) }
-        if let slash = cleaned.firstIndex(of: "/") { cleaned = String(cleaned[..<slash]) }
-        return cleaned
-    }
-
     private func validateDomainFormat(_ domain: String) -> String? {
         if domain.contains(" ") {
             return "Domain cannot contain spaces"
@@ -623,19 +614,6 @@ extension TriggerConfig {
             return "Not configured"
         }
     }
-
-    private func formatDuration(_ seconds: Int) -> String {
-        let hours = seconds / 3600
-        let minutes = (seconds % 3600) / 60
-
-        if hours > 0 && minutes > 0 {
-            return "\(hours)h \(minutes)m"
-        } else if hours > 0 {
-            return "\(hours) hour\(hours == 1 ? "" : "s")"
-        } else {
-            return "\(minutes) minute\(minutes == 1 ? "" : "s")"
-        }
-    }
 }
 
 // MARK: - Independent Trigger Summary Row
@@ -683,19 +661,6 @@ struct IndependentTriggerSummaryRow: View {
     private var triggerSummary: String {
         let visitWord = trigger.maxVisits == 1 ? "visit" : "visits"
         return "After \(trigger.maxVisits) \(visitWord), block for \(formatDuration(trigger.blockDurationSeconds))"
-    }
-
-    private func formatDuration(_ seconds: Int) -> String {
-        let hours = seconds / 3600
-        let minutes = (seconds % 3600) / 60
-
-        if hours > 0 && minutes > 0 {
-            return "\(hours)h \(minutes)m"
-        } else if hours > 0 {
-            return "\(hours) hour\(hours == 1 ? "" : "s")"
-        } else {
-            return "\(minutes) minute\(minutes == 1 ? "" : "s")"
-        }
     }
 }
 
