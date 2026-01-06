@@ -16,7 +16,7 @@ struct DaemonStatusIndicator: View {
                 .fill(isRunning ? .green : .red)
                 .frame(width: 8, height: 8)
 
-            Text(isRunning ? "Daemon Running" : "Daemon Offline")
+            Text(isRunning ? "Running" : "Offline")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
