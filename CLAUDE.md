@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Willpower is a macOS website blocker app ("SelfControl 2.0") built with SwiftUI. It blocks websites via `/etc/hosts` manipulation using a privileged daemon architecture.
+Willpower is a macOS website blocker app built with SwiftUI. It blocks websites via `/etc/hosts` manipulation using a privileged daemon architecture.
 
 **Structure:**
 - **Willpower/** - Main SwiftUI app (sandboxed, manages UI/configuration)

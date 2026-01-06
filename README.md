@@ -1,6 +1,6 @@
 # Willpower
 
-A macOS website blocker that uses `/etc/hosts` manipulation via a privileged daemon. Modern Swift replacement for SelfControl.
+A macOS website blocker that uses `/etc/hosts` manipulation via a privileged daemon. Modern Swift replacement inspired by [SelfControl](https://github.com/SelfControlApp/selfcontrol).
 
 ## Features
 
