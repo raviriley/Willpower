@@ -25,6 +25,12 @@ public enum IPCRole: String, Sendable {
 /// Note: App Groups were removed because macOS macl (Mandatory Access Control Label)
 /// blocks root daemon access to user's App Groups container.
 /// TODO: Replace with XPC for more secure communication in a future release.
+///
+/// Thread Safety: Marked `@unchecked Sendable` because thread safety is guaranteed by:
+/// - Immutable properties after initialization (encoder, decoder, role)
+/// - FileManager operations are thread-safe
+/// - File-level locking for state modifications (see `queueCommand`)
+/// - No shared mutable state between method calls
 public final class IPCManager: @unchecked Sendable {
 
     // MARK: - Constants
