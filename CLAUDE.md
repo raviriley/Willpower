@@ -27,19 +27,19 @@ cd WillpowerKit && swift test
 ## Architecture
 
 ### Privilege Separation Model
-- **App** (sandboxed): User-facing SwiftUI interface with SwiftData persistence
+- **App** (sandboxed): User-facing SwiftUI interface
 - **Daemon** (privileged): Runs as LaunchDaemon, has write access to `/etc/hosts`
 - **Shared Kit**: Common models and logic, no external dependencies
 
 ### Key Technologies
-- SwiftUI + SwiftData for UI and persistence
+- SwiftUI for UI
 - SMAppService.daemon for privileged helper registration (macOS 13+)
 - File-based IPC at `/Library/Application Support/Willpower/ipc/`
 - PF (packet filter) firewall for network-level blocking
 - AppleScript for browser URL monitoring
 
 ### Data Flow
-1. User creates blocklists in SwiftUI app (stored via SwiftData)
+1. User creates blocklists in SwiftUI app (synced via IPC to daemon)
 2. App communicates configuration to daemon via file-based IPC (state.json, commands.json)
 3. Daemon modifies `/etc/hosts` with blocked domains
 4. Daemon also applies PF firewall rules for network-level blocking
@@ -76,10 +76,13 @@ Key completed features:
 - `WillpowerKit/Sources/WillpowerKit/HostsManager.swift` - /etc/hosts manipulation
 - `WillpowerKit/Sources/WillpowerKit/PacketFilterManager.swift` - PF firewall rules
 - `WillpowerKit/Sources/WillpowerKit/Logger.swift` - Unified os_log logging
+- `WillpowerKit/Sources/WillpowerKit/BrowserMonitor.swift` - AppleScript-based browser URL monitoring
+- `WillpowerKit/Sources/WillpowerKit/TriggerEvaluator.swift` - Schedule and visit-count trigger evaluation
 - `WillpowerDaemon/main.swift` - Daemon entry point and run loop
 - `Willpower/ViewModels/WillpowerViewModel.swift` - Central app state management
 - `Willpower/DaemonManager.swift` - SMAppService.daemon registration
-- `CHANGELOG.md` - Development history and TODO tracking
+- `CHANGELOG.md` - Development TODOs
+- `XPC_TODO.md` - Planned XPC migration (future release)
 
 ## Build Configuration
 
