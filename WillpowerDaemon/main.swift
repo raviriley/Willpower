@@ -70,7 +70,7 @@ let triggerEvaluator = TriggerEvaluator()
 
 /// Track previous blocked domains to detect changes (must be before dispatchMain)
 /// nil = never synced (force initial sync), empty = synced with no domains
-var previousBlockedDomains: Set<String>? = nil
+var previousBlockedDomains: Set<String>?
 
 // NOTE: BrowserMonitor runs in the app, not the daemon.
 // The daemon runs as root and doesn't have access to user's GUI session
@@ -323,7 +323,7 @@ func activateBlocklist(
     }
 
     // Calculate expiration based on trigger
-    var expiresAt: Date? = nil
+    var expiresAt: Date?
     var reason: ActiveBlock.BlockReason = .manualActivation
 
     if let trigger {
@@ -414,8 +414,8 @@ func evaluateTriggers(
         guard hasScheduleTrigger else { continue }
 
         // Check if already has an active block
-        let existingBlock = mutableState.activeBlocks.first { $0.blocklistId == blocklist.id }
-        if existingBlock != nil && !existingBlock!.isExpired {
+        if let existingBlock = mutableState.activeBlocks.first(where: { $0.blocklistId == blocklist.id }),
+           !existingBlock.isExpired {
             continue  // Already blocked
         }
 
@@ -473,11 +473,7 @@ func evaluateIndependentTriggers(state: WillpowerState) -> WillpowerState {
         for pattern in trigger.urlPatterns {
             // Check if this pattern already has an active block
             let patternBlockId = pattern.id  // Use pattern ID as block identifier
-            let existingBlock = mutableState.activeBlocks.first {
-                $0.blocklistId == patternBlockId && !$0.isExpired
-            }
-
-            if existingBlock != nil {
+            if mutableState.activeBlocks.contains(where: { $0.blocklistId == patternBlockId && !$0.isExpired }) {
                 continue  // Already blocked
             }
 
