@@ -106,6 +106,11 @@ final class DaemonManager {
         let service = SMAppService.daemon(plistName: Self.plistName)
         status = service.status
         logger.info("Daemon status: \(self.statusDescription) (raw: \(String(describing: self.status)))")
+
+        // Clear any previous error if daemon is now successfully running
+        if status == .enabled {
+            lastError = nil
+        }
     }
 
     /// Register the daemon with launchd
