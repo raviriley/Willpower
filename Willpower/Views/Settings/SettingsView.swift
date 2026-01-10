@@ -154,7 +154,7 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                Link(destination: URL(string: "https://github.com/raviriley/willpower")!) {
+                Link(destination: URL(string: "https://github.com/raviriley/Willpower")!) {
                     Label("View on GitHub", systemImage: "link")
                 }
                 .buttonStyle(.borderless)
