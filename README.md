@@ -17,7 +17,7 @@ Compatible with macOS 14 and later.
 ## Features
 
 - Schedule-based and manual activation of blocklists
-- Browser URL monitoring for visit-count triggers (supports Safari, Chrome, Firefox, Arc, Brave, Edge)
+- Browser URL monitoring for visit-count triggers on all modern browsers (supports Safari, Chrome, Chromium-based browsers (Arc, Brave, Edge, etc.), and Firefox)
 - Unbreakable blocking: you won't be able to access blocked sites even if you restart your computer or delete the app.
 - Blocklist presets for common categories (social media, news, streaming, gaming)
 
