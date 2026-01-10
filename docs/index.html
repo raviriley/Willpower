@@ -20,6 +20,8 @@
     <meta name="author" content="Ravi Riley">
     <meta name="robots" content="index, follow">
     <link rel="canonical" href="https://willpowerapp.com/">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <link rel="apple-touch-icon" href="favicon.png">
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
@@ -40,8 +42,8 @@
     <meta name="twitter:creator" content="@ravi_riley">
 
     <!-- Theme Color -->
-    <meta name="theme-color" content="#0071e3" media="(prefers-color-scheme: light)">
-    <meta name="theme-color" content="#2997ff" media="(prefers-color-scheme: dark)">
+    <meta name="theme-color" content="#6345C6" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#8b7bd4" media="(prefers-color-scheme: dark)">
     <meta name="apple-mobile-web-app-title" content="Willpower">
 
     <!-- Structured Data -->
@@ -76,8 +78,8 @@
             --bg: #ffffff;
             --text: #1d1d1f;
             --text-secondary: #6e6e73;
-            --accent: #0071e3;
-            --accent-hover: #0077ed;
+            --accent: #6345C6;
+            --accent-hover: #7558d1;
             --card-bg: #f5f5f7;
             --border: #d2d2d7;
         }
@@ -87,8 +89,8 @@
                 --bg: #000000;
                 --text: #f5f5f7;
                 --text-secondary: #a1a1a6;
-                --accent: #2997ff;
-                --accent-hover: #4dabff;
+                --accent: #8b7bd4;
+                --accent-hover: #a192de;
                 --card-bg: #1d1d1f;
                 --border: #424245;
             }
@@ -166,12 +168,23 @@
             max-width: 100%;
             height: auto;
             border-radius: 12px;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+        }
+
+        .screenshot .light-mode {
+            display: block;
+        }
+
+        .screenshot .dark-mode {
+            display: none;
         }
 
         @media (prefers-color-scheme: dark) {
-            .screenshot img {
-                box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+            .screenshot .light-mode {
+                display: none;
+            }
+
+            .screenshot .dark-mode {
+                display: block;
             }
         }
 
@@ -285,7 +298,8 @@
 
         <section class="screenshot">
             <div class="container">
-                <img src="https://github.com/user-attachments/assets/de445452-e6f1-4f42-80c2-e030717eb235" alt="Willpower macOS app interface showing blocklist management with options to block social media, news, and streaming websites" width="1112" height="827" loading="lazy">
+                <img class="light-mode" src="screenshot.png" alt="Willpower macOS app interface showing blocklist management with options to block social media, news, and streaming websites" width="2024" height="1558" loading="lazy">
+                <img class="dark-mode" src="screenshot_dark.png" alt="Willpower macOS app interface showing blocklist management with options to block social media, news, and streaming websites" width="2024" height="1558" loading="lazy">
             </div>
         </section>
 
@@ -306,7 +320,7 @@
                             </svg>
                         </div>
                         <h3>Blocklists</h3>
-                        <p>Group distracting sites together. Presets for social media, news, streaming, and more.</p>
+                        <p>Make a list of distracting websites and block them all at once. Or pick from our premade ones.</p>
                     </div>
                     <div class="feature-card">
                         <div class="feature-icon">
@@ -326,7 +340,7 @@
                             </svg>
                         </div>
                         <h3>Visit Limits</h3>
-                        <p>Block sites after too many visits. Supports Safari, Chrome, Firefox, Arc, Brave, and Edge.</p>
+                        <p>Block sites after too many visits. Supports all modern browsers.</p>
                     </div>
                     <div class="feature-card">
                         <div class="feature-icon">
