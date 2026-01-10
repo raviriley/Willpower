@@ -16,15 +16,20 @@ struct TimeRemainingView: View {
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var body: some View {
-        Text(formattedTime)
-            .font(.system(.body, design: .monospaced))
-            .foregroundStyle(timeRemaining < 300 ? .red : .primary)
-            .onReceive(timer) { _ in
-                timeRemaining = max(0, expiresAt.timeIntervalSinceNow)
-            }
-            .onAppear {
-                timeRemaining = max(0, expiresAt.timeIntervalSinceNow)
-            }
+        HStack(spacing: 4) {
+            Text(formattedTime)
+                .font(.system(.body, design: .monospaced))
+                .foregroundStyle(timeRemaining < 300 ? .red : .primary)
+            Text("(until \(formattedEndTime))")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+        }
+        .onReceive(timer) { _ in
+            timeRemaining = max(0, expiresAt.timeIntervalSinceNow)
+        }
+        .onAppear {
+            timeRemaining = max(0, expiresAt.timeIntervalSinceNow)
+        }
     }
 
     private var formattedTime: String {
@@ -37,6 +42,10 @@ struct TimeRemainingView: View {
         } else {
             return String(format: "%02d:%02d", minutes, seconds)
         }
+    }
+
+    private var formattedEndTime: String {
+        expiresAt.formatted(date: .omitted, time: .shortened)
     }
 }
 
