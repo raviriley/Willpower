@@ -50,6 +50,12 @@ log_header "GitHub Release: v$VERSION"
 log_step "Building release..."
 "$SCRIPTS_DIR/release.sh" "$VERSION"
 
+# Commit version changes made by release.sh
+log_step "Committing version changes..."
+git add "$PROJECT_DIR/Willpower.xcodeproj/project.pbxproj"
+git commit -m "Bump version to $VERSION"
+git push origin main
+
 # Paths
 RELEASE_DIR="$RELEASES_DIR/$VERSION"
 DMG_PATH="$RELEASE_DIR/Willpower-${VERSION}.dmg"
@@ -171,3 +177,7 @@ log_info "  DMG: https://github.com/$GITHUB_REPO/releases/download/v$VERSION/Wil
 log_info "  Appcast: https://github.com/$GITHUB_REPO/releases/download/v$VERSION/appcast.xml"
 log_info ""
 log_info "Users with existing installations will be notified of the update!"
+
+# Sync the release tag locally
+git fetch --tags
+log_info "Tag v$VERSION synced locally"
