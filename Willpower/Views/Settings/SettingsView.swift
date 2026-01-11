@@ -28,14 +28,14 @@ struct SettingsView: View {
             // MARK: - Status Section
             Section {
                 HStack {
-                    Label("Protection Status", systemImage: "shield.checkered")
+                    Label("Blocking Status", systemImage: viewModel.activeBlocks.isEmpty ? "shield" : "shield.fill")
                     Spacer()
                     HStack(spacing: 6) {
                         Circle()
-                            .fill(protectionStatusColor)
+                            .fill(blockingStatusColor)
                             .frame(width: 8, height: 8)
-                        Text(protectionStatusText)
-                            .foregroundStyle(protectionStatusColor)
+                        Text(blockingStatusText)
+                            .foregroundStyle(blockingStatusColor)
                     }
                 }
 
@@ -186,14 +186,14 @@ struct SettingsView: View {
 
     // MARK: - Computed Properties
 
-    private var protectionStatusColor: Color {
+    private var blockingStatusColor: Color {
         if viewModel.isDaemonRunning {
             return viewModel.activeBlocks.isEmpty ? .green : .blue
         }
         return .red
     }
 
-    private var protectionStatusText: String {
+    private var blockingStatusText: String {
         if viewModel.isDaemonRunning {
             if viewModel.activeBlocks.isEmpty {
                 return "Ready"
@@ -201,7 +201,7 @@ struct SettingsView: View {
                 return "Blocking \(viewModel.totalDomainsBlocked) domains"
             }
         }
-        return "Not Protected"
+        return "Not Blocking"
     }
 
     private var hasLockedBlocks: Bool {
