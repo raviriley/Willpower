@@ -91,3 +91,12 @@ Key completed features:
 - **Architecture**: arm64
 - App Sandbox enabled for main app
 - Hardened Runtime enabled for both app and daemon
+
+## Releases
+
+Always use `scripts/github-release.sh <version>` for releases. This script:
+1. Builds, signs, notarizes, and creates DMG
+2. Commits version bump to project.pbxproj
+3. Generates appcast.xml for Sparkle updates
+4. Creates GitHub Release with DMG and appcast
+5. Syncs release tag locally
