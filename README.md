@@ -31,4 +31,5 @@ See [DEVELOPMENT.md](DEVELOPMENT.md) for instructions on building from source an
 
 ## License
 
-MIT License
+This project is licensed under the GNU General Public License v3.0 (GPL-3.0).
+This software is provided “as is”, without warranty; see the `LICENSE` file for the full text.
