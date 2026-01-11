@@ -23,6 +23,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var mainWindow: NSWindow?
     private var isWindowVisible = false
     private var iconUpdateTimer: Timer?
+    private lazy var logoIcon: NSImage = createLogoIcon()
 
     // MARK: - Configuration
 
@@ -180,12 +181,94 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard let button = statusItem?.button else { return }
 
         let isBlocking = !(viewModel?.activeBlocks.isEmpty ?? true)
-        let symbolName = isBlocking ? "shield.fill" : "shield"
 
-        if let image = NSImage(systemSymbolName: symbolName, accessibilityDescription: "Willpower") {
-            let config = NSImage.SymbolConfiguration(pointSize: 16, weight: .medium)
-            button.image = image.withSymbolConfiguration(config)
+        if isBlocking {
+            // Active state: filled shield SF Symbol
+            if let image = NSImage(systemSymbolName: "shield.fill", accessibilityDescription: "Willpower Active") {
+                let config = NSImage.SymbolConfiguration(pointSize: 16, weight: .medium)
+                button.image = image.withSymbolConfiguration(config)
+            }
+        } else {
+            // Inactive state: custom logo (shield with W)
+            button.image = logoIcon
         }
+    }
+
+    /// Creates the custom Willpower logo icon for menu bar (shield with W)
+    private func createLogoIcon() -> NSImage {
+        let size: CGFloat = 18  // Menu bar icon size
+        let image = NSImage(size: NSSize(width: size, height: size), flipped: false) { rect in
+            NSColor.black.setStroke()
+
+            // Scale factor: SVG viewBox is 24x24, we want 18x18
+            let scale = size / 24.0
+            let lineWidth: CGFloat = 1.5
+
+            // Draw shield outline (based on logo.svg path)
+            let shieldPath = NSBezierPath()
+            shieldPath.lineWidth = lineWidth
+            shieldPath.lineCapStyle = .round
+            shieldPath.lineJoinStyle = .round
+
+            // Shield path - approximate the Lucide shield shape
+            // Start from bottom-left curve up
+            shieldPath.move(to: NSPoint(x: 4 * scale, y: (24 - 13) * scale))
+            shieldPath.line(to: NSPoint(x: 4 * scale, y: (24 - 6) * scale))
+
+            // Top left corner and top curve
+            shieldPath.curve(to: NSPoint(x: 12 * scale, y: (24 - 2.28) * scale),
+                            controlPoint1: NSPoint(x: 4 * scale, y: (24 - 5) * scale),
+                            controlPoint2: NSPoint(x: 9 * scale, y: (24 - 2.28) * scale))
+
+            // Top right curve
+            shieldPath.curve(to: NSPoint(x: 20 * scale, y: (24 - 6) * scale),
+                            controlPoint1: NSPoint(x: 15 * scale, y: (24 - 2.28) * scale),
+                            controlPoint2: NSPoint(x: 20 * scale, y: (24 - 5) * scale))
+
+            // Right side down
+            shieldPath.line(to: NSPoint(x: 20 * scale, y: (24 - 13) * scale))
+
+            // Bottom right curve to center
+            shieldPath.curve(to: NSPoint(x: 12 * scale, y: (24 - 21.95) * scale),
+                            controlPoint1: NSPoint(x: 20 * scale, y: (24 - 18) * scale),
+                            controlPoint2: NSPoint(x: 16 * scale, y: (24 - 21) * scale))
+
+            // Bottom left curve back to start
+            shieldPath.curve(to: NSPoint(x: 4 * scale, y: (24 - 13) * scale),
+                            controlPoint1: NSPoint(x: 8 * scale, y: (24 - 21) * scale),
+                            controlPoint2: NSPoint(x: 4 * scale, y: (24 - 18) * scale))
+
+            shieldPath.stroke()
+
+            // Draw W inside the shield
+            let wPath = NSBezierPath()
+            wPath.lineWidth = lineWidth
+            wPath.lineCapStyle = .round
+            wPath.lineJoinStyle = .round
+
+            // Left vertical line of W
+            wPath.move(to: NSPoint(x: 8.5 * scale, y: (24 - 8) * scale))
+            wPath.line(to: NSPoint(x: 8.5 * scale, y: (24 - 16) * scale))
+
+            // Right vertical line of W
+            wPath.move(to: NSPoint(x: 15.5 * scale, y: (24 - 8) * scale))
+            wPath.line(to: NSPoint(x: 15.5 * scale, y: (24 - 16) * scale))
+
+            // Left diagonal to center
+            wPath.move(to: NSPoint(x: 8.5 * scale, y: (24 - 16) * scale))
+            wPath.line(to: NSPoint(x: 12 * scale, y: (24 - 12) * scale))
+
+            // Right diagonal to center
+            wPath.move(to: NSPoint(x: 15.5 * scale, y: (24 - 16) * scale))
+            wPath.line(to: NSPoint(x: 12 * scale, y: (24 - 12) * scale))
+
+            wPath.stroke()
+
+            return true
+        }
+
+        image.isTemplate = true  // Allows automatic light/dark mode adaptation
+        return image
     }
 
     private func updateStatusMenuItem() {
