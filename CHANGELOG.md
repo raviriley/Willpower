@@ -2,6 +2,9 @@
 
 ## Releases
 
+### 1.0.5
+- Update menu bar icon to match app icon
+
 ### 1.0.4
 - Add "How it Works" section for triggers
 - Improve "Blocking Status" in settings
