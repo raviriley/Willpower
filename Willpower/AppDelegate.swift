@@ -284,7 +284,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Try standard AppKit mechanism to trigger window creation
         // This triggers the "New Window" menu action in SwiftUI apps
         if #available(macOS 13.0, *) {
-            NSApp.sendAction(Selector(("newWindowForTab:")), to: nil, from: nil)
+            NSApp.sendAction(#selector(NSResponder.newWindowForTab(_:)), to: nil, from: nil)
         }
 
         // Check for window after a delay
