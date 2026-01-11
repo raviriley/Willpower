@@ -5,6 +5,7 @@
 # Usage: ./scripts/release.sh <version>
 #
 # This script automates the entire release process:
+#   0. Update version numbers in Xcode project
 #   1. Clean build in Release configuration
 #   2. Code sign with Developer ID
 #   3. Notarize with Apple
@@ -85,6 +86,24 @@ mkdir -p "$BUILD_DIR"
 mkdir -p "$RELEASES_DIR/$VERSION"
 
 RELEASE_OUTPUT_DIR="$RELEASES_DIR/$VERSION"
+
+# Update version numbers in Xcode project
+log_header "Updating Version Numbers"
+
+PBXPROJ="$PROJECT_DIR/Willpower.xcodeproj/project.pbxproj"
+
+# Get current build number and increment
+CURRENT_BUILD=$(grep -m1 'CURRENT_PROJECT_VERSION = ' "$PBXPROJ" | sed 's/.*= \([0-9]*\);/\1/')
+NEW_BUILD=$((CURRENT_BUILD + 1))
+
+# Update MARKETING_VERSION (appears twice - Debug and Release configs)
+sed -i '' "s/MARKETING_VERSION = [^;]*;/MARKETING_VERSION = $VERSION;/g" "$PBXPROJ"
+
+# Update CURRENT_PROJECT_VERSION (appears twice - Debug and Release configs)
+sed -i '' "s/CURRENT_PROJECT_VERSION = [^;]*;/CURRENT_PROJECT_VERSION = $NEW_BUILD;/g" "$PBXPROJ"
+
+log_info "MARKETING_VERSION = $VERSION"
+log_info "CURRENT_PROJECT_VERSION = $NEW_BUILD (was $CURRENT_BUILD)"
 
 log_header "Step 1/4: Building Release"
 
