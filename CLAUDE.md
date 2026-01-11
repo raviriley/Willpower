@@ -99,4 +99,5 @@ Always use `scripts/github-release.sh <version>` for releases. This script:
 2. Commits version bump to project.pbxproj
 3. Generates appcast.xml for Sparkle updates
 4. Creates GitHub Release with DMG and appcast
-5. Syncs release tag locally
+5. Updates the download URL in docs/index.html
+6. Syncs release tag locally
