@@ -64,6 +64,16 @@
 		BA68A52F2F03466D00112297 /* WillpowerDaemon */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = WillpowerDaemon; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		BA31D9B12F132A4800E699C4 /* Exceptions for "Willpower" folder in "Willpower" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = BA68A51A2F03461E00112297 /* Willpower */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
 		BA54CBFD2F03ABD300E56C58 /* Exceptions for "WillpowerDaemon" folder in "Copy Daemon Plist" phase from "Willpower" target */ = {
 			isa = PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet;
@@ -77,6 +87,9 @@
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		BA68A51D2F03461E00112297 /* Willpower */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				BA31D9B12F132A4800E699C4 /* Exceptions for "Willpower" folder in "Willpower" target */,
+			);
 			path = Willpower;
 			sourceTree = "<group>";
 		};
