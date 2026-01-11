@@ -14,6 +14,8 @@ Compatible with macOS 14 and later.
 
 <img width="1112" height="827" alt="Screenshot 2026-01-06 at 6 52 58 PM" src="https://github.com/user-attachments/assets/de445452-e6f1-4f42-80c2-e030717eb235" />
 
+See [DEVELOPMENT.md](DEVELOPMENT.md) for instructions on building from source and development details.
+
 ## Features
 
 - Schedule-based and manual activation of blocklists
@@ -21,7 +23,11 @@ Compatible with macOS 14 and later.
 - Unbreakable blocking: you won't be able to access blocked sites even if you restart your computer or delete the app.
 - Blocklist presets for common categories (social media, news, streaming, gaming)
 
-See [DEVELOPMENT.md](DEVELOPMENT.md) for instructions on building from source and development details.
+## Known Limitations
+
+- Blocking `youtube.com` can block Google apps like Google Meet, Google Docs, etc. from working, because Google often routes auth requests through YouTube's servers.
+- Proxies and VPNs can mess with blocking
+  - Willpower disables iCloud Private Relay when blocking sites, otherwise Safari would bypass the blocklist.
 
 ## License
 
