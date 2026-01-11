@@ -2,6 +2,10 @@
 
 ## Releases
 
+### 1.0.4
+- Add "How it Works" section for triggers
+- Improve "Blocking Status" in settings
+
 ### 1.0.3
 - Show end time next to countdown timers (e.g., "05:30 (until 3:45 PM)")
 
