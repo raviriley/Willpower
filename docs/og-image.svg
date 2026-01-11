@@ -22,20 +22,20 @@
 
   <!-- Screenshot with rounded corners and shadow -->
   <!-- Screenshot dimensions: 2024x1558, aspect ratio: 1.299:1 -->
-  <g transform="translate(60, 122)" filter="url(#shadow)">
+  <g transform="translate(40, 50)" filter="url(#shadow)">
     <clipPath id="screenClip">
-      <rect x="0" y="0" width="500" height="385" rx="12" ry="12"/>
+      <rect x="0" y="0" width="690" height="531" rx="12" ry="12"/>
     </clipPath>
     <image
       x="0" y="0"
-      width="500" height="385"
+      width="690" height="531"
       preserveAspectRatio="xMidYMid meet"
       clip-path="url(#screenClip)"
       xlink:href="screenshot.png"/>
   </g>
 
   <!-- Right side content -->
-  <g transform="translate(640, 120)">
+  <g transform="translate(770, 128)">
     <!-- Logo -->
     <g transform="translate(0, 0)">
       <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#6345C6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -47,21 +47,16 @@
       </svg>
     </g>
 
-    <!-- Domain pill -->
-    <g transform="translate(70, 8)">
-      <rect x="0" y="0" width="180" height="40" rx="20" ry="20" fill="#fff" stroke="#d2d2d7" stroke-width="1"/>
-      <text x="90" y="26" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" font-size="16" font-weight="500" fill="#1d1d1f" text-anchor="middle">willpowerapp.com</text>
-    </g>
 
     <!-- Title -->
     <text font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" font-weight="600" fill="#1d1d1f">
       <tspan x="0" y="120" font-size="42">Willpower</tspan>
-      <tspan x="0" y="172" font-size="32" fill="#6e6e73">macOS Website Blocker</tspan>
-      <tspan x="0" y="212" font-size="32" fill="#6e6e73">for Focus &amp; Productivity</tspan>
+      <tspan x="0" y="168" font-size="32" fill="#6e6e73">macOS Website Blocker</tspan>
+      <tspan x="0" y="208" font-size="32" fill="#6e6e73">for Focus &amp; Productivity</tspan>
     </text>
 
     <!-- CTA Button -->
-    <g transform="translate(0, 260)" filter="url(#btnShadow)">
+    <g transform="translate(0, 250)" filter="url(#btnShadow)">
       <rect x="0" y="0" width="200" height="56" rx="28" ry="28" fill="#6345C6"/>
       <text x="100" y="36" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" font-size="18" font-weight="600" fill="#fff" text-anchor="middle">Download Now</text>
     </g>
