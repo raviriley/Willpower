@@ -178,6 +178,25 @@ log_info "  Appcast: https://github.com/$GITHUB_REPO/releases/download/v$VERSION
 log_info ""
 log_info "Users with existing installations will be notified of the update!"
 
+# Update the download URL in the docs/index.html file
+log_step "Updating download URL in docs/index.html..."
+DOCS_INDEX="$PROJECT_DIR/docs/index.html"
+if [ -f "$DOCS_INDEX" ]; then
+    # Update the download button URL (matches any version pattern)
+    sed -i '' -E "s|releases/download/v[0-9]+\.[0-9]+\.[0-9]+/Willpower-[0-9]+\.[0-9]+\.[0-9]+\.dmg|releases/download/v$VERSION/Willpower-$VERSION.dmg|g" "$DOCS_INDEX"
+
+    # Update the softwareVersion in structured data
+    sed -i '' -E "s|\"softwareVersion\": \"[0-9]+\.[0-9]+\.[0-9]+\"|\"softwareVersion\": \"$VERSION\"|g" "$DOCS_INDEX"
+
+    # Commit the docs update
+    git add "$DOCS_INDEX"
+    git commit -m "Update download link to v$VERSION"
+    git push origin main
+    log_info "Updated docs/index.html with v$VERSION download link"
+else
+    log_warn "docs/index.html not found, skipping URL update"
+fi
+
 # Sync the release tag locally
 git fetch --tags
 log_info "Tag v$VERSION synced locally"
