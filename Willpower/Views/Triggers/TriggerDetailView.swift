@@ -51,6 +51,42 @@ struct TriggerDetailView: View {
         }
     }
 
+    /// All unique domains that will be blocked when this trigger fires
+    var domainsToBlock: [String] {
+        var seen = Set<String>()
+        return urlPatterns.compactMap { pattern -> String? in
+            guard case .blockDomain = pattern.blockAction else { return nil }
+            return seen.insert(pattern.associatedDomain).inserted ? pattern.associatedDomain : nil
+        }
+    }
+
+    /// All blocklists that will be activated when this trigger fires
+    var blocklistsToActivate: [(id: UUID, name: String)] {
+        var seen = Set<UUID>()
+        return urlPatterns.compactMap { pattern -> (id: UUID, name: String)? in
+            guard case .activateBlocklist(let blocklistId) = pattern.blockAction,
+                  seen.insert(blocklistId).inserted,
+                  let blocklist = viewModel.blocklists.first(where: { $0.id == blocklistId })
+            else { return nil }
+            return (id: blocklist.id, name: blocklist.name)
+        }
+    }
+
+    /// Formatted duration string for display
+    var formattedDuration: String {
+        formatDuration(blockDurationMinutes * 60)
+    }
+
+    /// Substring patterns (non-regex)
+    var substringPatterns: [String] {
+        urlPatterns.filter { !$0.isRegex }.map(\.pattern)
+    }
+
+    /// Regex patterns
+    var regexPatterns: [String] {
+        urlPatterns.filter { $0.isRegex }.map(\.pattern)
+    }
+
     var body: some View {
         Group {
             if trigger != nil {
@@ -103,15 +139,22 @@ struct TriggerDetailView: View {
                     // URL Patterns Section
                     Section("URL Patterns to Monitor") {
                         ForEach(urlPatterns) { pattern in
-                            HStack(alignment: .top) {
+                            HStack(alignment: .center) {
                                 VStack(alignment: .leading, spacing: 4) {
-                                    Text("When you visit a URL \(maxVisits) time\(maxVisits == 1 ? "" : "s") that \(pattern.isRegex ? "matches regex" : "contains"):")
+                                    HStack(spacing: 6) {
+                                        Text(pattern.pattern)
+                                            .font(.system(.body, design: .monospaced))
+                                        if pattern.isRegex {
+                                            Text("regex")
+                                                .font(.caption2)
+                                                .padding(.horizontal, 6)
+                                                .padding(.vertical, 2)
+                                                .background(Color.secondary.opacity(0.2))
+                                                .clipShape(Capsule())
+                                        }
+                                    }
+                                    Text(compactBlockActionDescription(for: pattern))
                                         .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                    Text(pattern.pattern)
-                                        .font(.system(.body, design: .monospaced))
-                                    Text(blockActionDescription(for: pattern))
-                                        .font(.callout)
                                         .foregroundStyle(.secondary)
                                 }
                                 Spacer()
@@ -183,6 +226,71 @@ struct TriggerDetailView: View {
                                 }
                             }
                             .pickerStyle(.menu)
+                        }
+                    }
+
+                    // How It Works Section
+                    Section("How It Works") {
+                        VStack(alignment: .leading, spacing: 12) {
+                            if !urlPatterns.isEmpty {
+                                // Monitoring explanation with patterns
+                                VStack(alignment: .leading, spacing: 6) {
+                                    let timesText = "\(maxVisits) time\(maxVisits == 1 ? "" : "s")"
+                                    Text("When you visit a URL \(timesText) that \(substringPatterns.isEmpty ? "matches regex:" : "contains:")")
+
+                                    if !substringPatterns.isEmpty {
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            ForEach(substringPatterns, id: \.self) { pattern in
+                                                Text(pattern)
+                                                    .font(.system(.callout, design: .monospaced))
+                                                    .foregroundStyle(.secondary)
+                                            }
+                                        }
+                                    }
+
+                                    if !regexPatterns.isEmpty {
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            if !substringPatterns.isEmpty {
+                                                Text("or matches regex:")
+                                            }
+                                            ForEach(regexPatterns, id: \.self) { pattern in
+                                                Text(pattern)
+                                                    .font(.system(.callout, design: .monospaced))
+                                                    .foregroundStyle(.secondary)
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Consequences
+                                if !domainsToBlock.isEmpty || !blocklistsToActivate.isEmpty {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        if !domainsToBlock.isEmpty {
+                                            Text("then \(pluralize("domain", "domains", count: domainsToBlock.count)) blocked for \(formattedDuration):")
+                                            ForEach(domainsToBlock, id: \.self) { domain in
+                                                DomainRow(domain: domain)
+                                            }
+                                        }
+
+                                        if !blocklistsToActivate.isEmpty {
+                                            let prefix = domainsToBlock.isEmpty ? "then" : "and"
+                                            Text("\(prefix) \(pluralize("blocklist", "blocklists", count: blocklistsToActivate.count)) activated for \(formattedDuration):")
+                                                .padding(.top, domainsToBlock.isEmpty ? 0 : 4)
+                                            ForEach(blocklistsToActivate, id: \.id) { item in
+                                                blocklistRow(item.name)
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    Text("No block actions configured yet.")
+                                        .font(.callout)
+                                        .foregroundStyle(.tertiary)
+                                }
+                            } else {
+                                Text("Add URL patterns above to start monitoring.")
+                                    .font(.callout)
+                                    .foregroundStyle(.tertiary)
+                            }
                         }
                     }
 
@@ -307,17 +415,32 @@ struct TriggerDetailView: View {
         viewModel.selectedTriggerId = nil
     }
 
-    private func blockActionDescription(for pattern: URLPattern) -> String {
-        let duration = formatDuration(blockDurationMinutes * 60)
+    private func compactBlockActionDescription(for pattern: URLPattern) -> String {
         switch pattern.blockAction {
         case .blockDomain:
-            return "→ \(pattern.associatedDomain) is blocked for \(duration)"
+            return "→ blocks \(pattern.associatedDomain)"
         case .activateBlocklist(let blocklistId):
             if let blocklist = viewModel.blocklists.first(where: { $0.id == blocklistId }) {
-                return "→ \(blocklist.name) blocklist is activated for \(duration)"
+                return "→ activates \(blocklist.name)"
             }
-            return "→ blocklist is activated for \(duration)"
+            return "→ activates blocklist"
         }
+    }
+
+    @ViewBuilder
+    private func blocklistRow(_ name: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: "list.bullet")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+            Text(name)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func pluralize(_ singular: String, _ plural: String, count: Int) -> String {
+        count == 1 ? "this \(singular) is" : "these \(plural) are"
     }
 
     private func validateURLPattern(_ pattern: String) -> String? {
