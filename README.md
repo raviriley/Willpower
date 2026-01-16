@@ -6,6 +6,8 @@ You can also set up scheduled blocking sessions, create blocklists for different
 
 Willpower is free and open source. Inspired by [SelfControl](https://github.com/SelfControlApp/selfcontrol).
 
+It's a bit buggy on newer macOS versions - your feedback and bug reports are welcome!
+
 ## Installation
 
 Go to the latest [release](https://github.com/raviriley/Willpower/releases/latest) and download the DMG file. Open the DMG file and drag the Willpower app to your Applications folder.
