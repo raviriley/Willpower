@@ -692,11 +692,6 @@ final class WillpowerViewModel {
         }
     }
 
-    /// All enabled independent triggers
-    var allIndependentTriggers: [IndependentTrigger] {
-        independentTriggers
-    }
-
     /// Check if the app needs to keep running in background for browser monitoring
     /// Used by AppDelegate to show quit warning when visit-based triggers are active
     var requiresBackgroundMonitoring: Bool {

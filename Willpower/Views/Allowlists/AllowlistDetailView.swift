@@ -118,7 +118,7 @@ struct AllowlistDetailView: View {
                     Section("Name") {
                         TextField("Allow List Name", text: $name)
                             .textFieldStyle(.plain)
-                            .onChange(of: name) { _, newValue in
+                            .onChange(of: name) { _, _ in
                                 saveIfValid()
                             }
                     }

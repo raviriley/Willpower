@@ -475,9 +475,8 @@ func evaluateIndependentTriggers(state: WillpowerState) -> WillpowerState {
 
         // Process each pattern's block action
         for pattern in trigger.urlPatterns {
-            // Check if this pattern already has an active block
-            let patternBlockId = pattern.id  // Use pattern ID as block identifier
-            if mutableState.activeBlocks.contains(where: { $0.blocklistId == patternBlockId && !$0.isExpired }) {
+            // Check if this pattern already has an active block (uses pattern.id as block identifier)
+            if mutableState.activeBlocks.contains(where: { $0.blocklistId == pattern.id && !$0.isExpired }) {
                 continue  // Already blocked
             }
 

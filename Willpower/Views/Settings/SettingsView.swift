@@ -51,9 +51,9 @@ struct SettingsView: View {
                         .buttonStyle(.bordered)
                         .controlSize(.small)
                     }
-                } else if viewModel.daemonVersion != nil && viewModel.daemonVersion != appVersionShort {
+                } else if let daemonVer = viewModel.daemonVersion, daemonVer != appVersionShort {
                     HStack {
-                        Text("Daemon version (\(viewModel.daemonVersion!)) differs from app (\(appVersionShort))")
+                        Text("Daemon version (\(daemonVer)) differs from app (\(appVersionShort))")
                             .font(.callout)
                             .foregroundStyle(.orange)
                         Spacer()
