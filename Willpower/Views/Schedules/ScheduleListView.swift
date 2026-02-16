@@ -61,11 +61,7 @@ struct ScheduleListView: View {
         .toolbar {
             ToolbarItem {
                 Menu {
-                    ForEach(viewModel.blocklists) { blocklist in
-                        Button(blocklist.name) {
-                            createNewSchedule(for: blocklist)
-                        }
-                    }
+                    scheduleMenuContent
                 } label: {
                     Label("Add Schedule", systemImage: "plus")
                 }
@@ -77,19 +73,15 @@ struct ScheduleListView: View {
                 ContentUnavailableView {
                     Label("No Schedules", systemImage: "calendar.badge.clock")
                 } description: {
-                    Text("Schedules automatically block websites at specific times. Perfect for work hours, study sessions, or bedtime routines.")
+                    Text("Schedules automatically activate blocklists or allowlists at specific times. Perfect for work hours, study sessions, or bedtime routines.")
                 } actions: {
                     if !viewModel.blocklists.isEmpty {
                         Menu("Add Schedule") {
-                            ForEach(viewModel.blocklists) { blocklist in
-                                Button(blocklist.name) {
-                                    createNewSchedule(for: blocklist)
-                                }
-                            }
+                            scheduleMenuContent
                         }
                         .buttonStyle(.borderedProminent)
                     } else {
-                        Text("Create a blocklist first")
+                        Text("Create a blocklist or allowlist first")
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -103,6 +95,28 @@ struct ScheduleListView: View {
             Task { @MainActor in
                 viewModel.selectedScheduleId = (blocklistId: pending.blocklist.id, triggerId: pending.trigger.id)
                 viewModel.pendingScheduleToEdit = nil
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var scheduleMenuContent: some View {
+        if !viewModel.regularBlocklists.isEmpty {
+            Section("Blocklists") {
+                ForEach(viewModel.regularBlocklists) { blocklist in
+                    Button(blocklist.name) {
+                        createNewSchedule(for: blocklist)
+                    }
+                }
+            }
+        }
+        if !viewModel.allowLists.isEmpty {
+            Section("Allowlists") {
+                ForEach(viewModel.allowLists) { blocklist in
+                    Button(blocklist.name) {
+                        createNewSchedule(for: blocklist)
+                    }
+                }
             }
         }
     }

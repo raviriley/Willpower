@@ -51,6 +51,8 @@ struct ContentListView: View {
                 StatusDashboardView(viewModel: viewModel)
             case .blocklists:
                 BlocklistListView(viewModel: viewModel)
+            case .allowlists:
+                AllowlistListView(viewModel: viewModel)
             case .schedules:
                 ScheduleListView(viewModel: viewModel)
             case .triggers:
@@ -89,6 +91,16 @@ struct DetailView: View {
                         "Select a Blocklist",
                         systemImage: "list.bullet.rectangle",
                         description: Text("Choose a blocklist from the list to view details")
+                    )
+                }
+            case .allowlists:
+                if let allowlistId = viewModel.selectedAllowlistId {
+                    AllowlistDetailView(viewModel: viewModel, allowlistId: allowlistId)
+                } else {
+                    ContentUnavailableView(
+                        "Select an Allow List",
+                        systemImage: "checkmark.shield",
+                        description: Text("Choose an allow list from the list to view details")
                     )
                 }
             case .schedules:

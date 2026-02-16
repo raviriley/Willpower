@@ -14,7 +14,7 @@ struct BlocklistListView: View {
     @State private var isShowingDeleteConfirmation = false
 
     var body: some View {
-        List(viewModel.blocklists, selection: $viewModel.selectedBlocklistId) { blocklist in
+        List(viewModel.regularBlocklists, selection: $viewModel.selectedBlocklistId) { blocklist in
             BlocklistRowView(
                 blocklist: blocklist,
                 isActive: viewModel.isBlocklistActive(blocklist),
@@ -63,7 +63,7 @@ struct BlocklistListView: View {
             }
         }
         .overlay {
-            if viewModel.blocklists.isEmpty {
+            if viewModel.regularBlocklists.isEmpty {
                 ContentUnavailableView {
                     Label("No Blocklists", systemImage: "list.bullet.rectangle")
                 } description: {

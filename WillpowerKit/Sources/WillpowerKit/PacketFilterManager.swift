@@ -31,6 +31,18 @@ public final class PacketFilterManager: Sendable {
     /// Backup path for pf.conf
     public static let pfConfBackupPath = "/etc/pf.conf.willpower.backup"
 
+    /// Essential Apple system domains that should always be accessible when allow list is active
+    /// These ensure macOS system services continue to function
+    public static let essentialSystemDomains = [
+        "apple.com", "icloud.com", "icloud-content.com", "cdn-apple.com",
+        "mzstatic.com", "push.apple.com", "gs.apple.com", "swscan.apple.com",
+        "swdist.apple.com", "mesu.apple.com", "appldnld.apple.com",
+        "configuration.apple.com", "ocsp.apple.com", "ocsp2.apple.com",
+        "crl.apple.com", "valid.apple.com", "captive.apple.com",
+        "time.apple.com", "lcdn-locator.apple.com", "lcdn-registration.apple.com",
+        "xp.apple.com", "aaplimg.com"
+    ]
+
     // MARK: - Errors
 
     public enum PFError: Error, LocalizedError {
@@ -131,6 +143,75 @@ public final class PacketFilterManager: Sendable {
         logger.info("Stopped pf blocking")
     }
 
+    /// Apply unified PF rules handling both blocklists and allowlists
+    /// - Parameters:
+    ///   - blockedDomains: Domains to block (from .block mode blocklists)
+    ///   - allowedDomains: Domains to allow (from .allow mode allowlists)
+    ///   - isAllowListActive: Whether any allow list is currently active
+    public func applyRules(blockedDomains: [String], allowedDomains: [String], isAllowListActive: Bool) throws {
+        guard getuid() == 0 else {
+            throw PFError.permissionDenied
+        }
+
+        // If nothing to enforce, clear rules
+        if blockedDomains.isEmpty && !isAllowListActive {
+            try stopBlock()
+            return
+        }
+
+        // Resolve blocked domain IPs
+        var blockedIPs = Set<String>()
+        for domain in blockedDomains {
+            blockedIPs.formUnion(resolveHostname(domain))
+            if !domain.hasPrefix("www.") {
+                blockedIPs.formUnion(resolveHostname("www.\(domain)"))
+            }
+        }
+
+        // Also resolve and block iCloud Private Relay infrastructure
+        for relayDomain in Self.privateRelayDomains {
+            blockedIPs.formUnion(resolveHostname(relayDomain))
+        }
+
+        // Resolve allowed domain IPs (only if allow list active)
+        var allowedIPs = Set<String>()
+        if isAllowListActive {
+            for domain in allowedDomains {
+                allowedIPs.formUnion(resolveHostname(domain))
+                if !domain.hasPrefix("www.") {
+                    allowedIPs.formUnion(resolveHostname("www.\(domain)"))
+                }
+            }
+
+            // Resolve essential system domain IPs
+            for domain in Self.essentialSystemDomains {
+                allowedIPs.formUnion(resolveHostname(domain))
+                allowedIPs.formUnion(resolveHostname("www.\(domain)"))
+            }
+
+            // Remove any IPs that are in the blocked set (block wins)
+            allowedIPs.subtract(blockedIPs)
+        }
+
+        // Generate unified ruleset
+        let rules = generateUnifiedRules(
+            blockedIPs: Array(blockedIPs),
+            allowedIPs: Array(allowedIPs),
+            isAllowListActive: isAllowListActive
+        )
+
+        // Write anchor file
+        try writeAnchorFile(rules: rules)
+
+        // Add anchor reference to pf.conf if not present
+        try ensureAnchorInPfConf()
+
+        // Enable pf and load rules
+        try enablePF()
+
+        logger.info("Applied unified rules: \(blockedIPs.count) blocked IPs, \(allowedIPs.count) allowed IPs, allowList=\(isAllowListActive)")
+    }
+
     /// Check if Willpower pf rules are currently active
     public func isBlockActive() -> Bool {
         let process = Process()
@@ -224,6 +305,51 @@ public final class PacketFilterManager: Sendable {
         }
 
         return ips
+    }
+
+    /// Generate unified PF ruleset for both block and allow modes
+    private func generateUnifiedRules(blockedIPs: [String], allowedIPs: [String], isAllowListActive: Bool) -> String {
+        var rules: [String] = []
+
+        // Section 1: Infrastructure (always allowed)
+        rules.append("# Infrastructure - always allowed")
+        rules.append("pass out quick on lo0 all")
+        rules.append("pass out quick proto udp from any to any port 53")
+        rules.append("pass out quick proto tcp from any to any port 53")
+        rules.append("pass out quick proto udp from any to any port { 67, 68 }")
+        rules.append("pass out quick proto { tcp, udp } from any to 10.0.0.0/8")
+        rules.append("pass out quick proto { tcp, udp } from any to 172.16.0.0/12")
+        rules.append("pass out quick proto { tcp, udp } from any to 192.168.0.0/16")
+
+        // Section 2: Explicitly blocked domain IPs (block wins over allow)
+        if !blockedIPs.isEmpty {
+            rules.append("")
+            rules.append("# Blocked domains")
+            for ip in blockedIPs {
+                rules.append("block return out quick proto tcp from any to \(ip)")
+                rules.append("block return out quick proto udp from any to \(ip)")
+            }
+        }
+
+        // Sections 3-4: Only when allow list is active
+        if isAllowListActive {
+            // Section 3: Allowed domain IPs
+            if !allowedIPs.isEmpty {
+                rules.append("")
+                rules.append("# Allowed domains (allow list)")
+                for ip in allowedIPs {
+                    rules.append("pass out quick proto { tcp, udp } from any to \(ip)")
+                }
+            }
+
+            // Section 4: Block all other web traffic
+            rules.append("")
+            rules.append("# Block all other web traffic (allow list enforcement)")
+            rules.append("block return out quick proto tcp from any to any port { 80, 443 }")
+            rules.append("block return out quick proto udp from any to any port { 80, 443 }")
+        }
+
+        return rules.joined(separator: "\n") + "\n"
     }
 
     /// Generate pf rules for blocking IPs

@@ -16,6 +16,7 @@ private let logger = WillpowerLogger.viewModel
 enum SidebarCategory: String, CaseIterable, Identifiable {
     case status = "Status"
     case blocklists = "Blocklists"
+    case allowlists = "Allowlists"
     case schedules = "Schedules"
     case triggers = "Triggers"
     case settings = "Settings"
@@ -26,6 +27,7 @@ enum SidebarCategory: String, CaseIterable, Identifiable {
         switch self {
         case .status: return "gauge.with.dots.needle.33percent"
         case .blocklists: return "list.bullet.rectangle"
+        case .allowlists: return "checkmark.shield"
         case .schedules: return "calendar.badge.clock"
         case .triggers: return "eye.trianglebadge.exclamationmark"
         case .settings: return "gear"
@@ -78,7 +80,9 @@ final class WillpowerViewModel {
 
     var selectedCategory: SidebarCategory = .status
     var selectedBlocklistId: UUID?
+    var selectedAllowlistId: UUID?
     var isShowingActivationSheet: Bool = false
+    var isShowingAllowlistActivationSheet: Bool = false
     var errorMessage: String?
     var isLoading: Bool = false
     
@@ -99,6 +103,10 @@ final class WillpowerViewModel {
     private let ipcManager: IPCManager
     private var syncTimer: Timer?
     private let browserMonitor: BrowserMonitor
+    private var hasCheckedDaemonVersion = false
+
+    /// Reference to DaemonManager for auto-updating daemon on app update
+    var daemonManager: DaemonManager?
 
     /// Local storage key for blocklists (fallback when IPC unavailable)
     private let localBlocklistsKey = "willpower.local.blocklists"
@@ -309,6 +317,16 @@ final class WillpowerViewModel {
             activeBlocks = mergedBlocks
             visitRecords = state.visitRecords
             daemonVersion = state.daemonVersion
+
+            // Auto-update daemon if version doesn't match app
+            if !hasCheckedDaemonVersion, let daemonVer = daemonVersion {
+                hasCheckedDaemonVersion = true
+                let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0"
+                if daemonVer != appVersion {
+                    logger.info("Daemon version \(daemonVer) differs from app \(appVersion), auto-updating...")
+                    daemonManager?.update()
+                }
+            }
         } else {
             // Daemon not running - ensure local state is loaded
             if blocklists.isEmpty || independentTriggers.isEmpty {
@@ -336,12 +354,27 @@ final class WillpowerViewModel {
         syncBlocklistsToIPC()
     }
 
-    /// Import a full blocklist (preserves triggers/schedules)
+    /// Create a new allow list
+    func createAllowlist(name: String, domains: [String]) {
+        let cleanedDomains = domains.map { cleanDomain($0) }.filter { !$0.isEmpty }
+        let newAllowlist = BlocklistConfig(name: name, domains: cleanedDomains, mode: .allow)
+
+        // Update local state first
+        blocklists.append(newAllowlist)
+        selectedAllowlistId = newAllowlist.id
+        saveLocalState()
+
+        // Try to sync to IPC (best effort)
+        syncBlocklistsToIPC()
+    }
+
+    /// Import a full blocklist (preserves triggers/schedules and mode)
     func importBlocklist(_ blocklist: BlocklistConfig) {
-        // Create new blocklist with fresh ID but preserve triggers
+        // Create new blocklist with fresh ID but preserve triggers and mode
         var imported = BlocklistConfig(
             name: blocklist.name,
-            domains: blocklist.domains.map { cleanDomain($0) }.filter { !$0.isEmpty }
+            domains: blocklist.domains.map { cleanDomain($0) }.filter { !$0.isEmpty },
+            mode: blocklist.mode
         )
         imported.triggers = blocklist.triggers
         imported.isActive = false  // Don't auto-activate imported blocklists
@@ -382,6 +415,9 @@ final class WillpowerViewModel {
         if selectedBlocklistId == blocklist.id {
             selectedBlocklistId = nil
         }
+        if selectedAllowlistId == blocklist.id {
+            selectedAllowlistId = nil
+        }
         saveLocalState()
 
         // Try to sync to IPC
@@ -420,6 +456,7 @@ final class WillpowerViewModel {
         let optimisticBlock = ActiveBlock(
             blocklistId: blocklist.id,
             domains: blocklist.domains,
+            mode: blocklist.mode,
             expiresAt: Date().addingTimeInterval(TimeInterval(durationSeconds)),
             reason: .timeBasedTrigger,
             isLocked: isLocked
@@ -607,9 +644,35 @@ final class WillpowerViewModel {
 
     // MARK: - Computed Properties
 
+    /// Regular blocklists (block mode only)
+    var regularBlocklists: [BlocklistConfig] {
+        blocklists.filter { $0.mode == .block }
+    }
+
+    /// Allowlists (allow mode only)
+    var allowLists: [BlocklistConfig] {
+        blocklists.filter { $0.mode == .allow }
+    }
+
+    /// Whether any allow list is currently active
+    var hasActiveAllowList: Bool {
+        activeBlocks.contains { !$0.isExpired && $0.mode == .allow }
+    }
+
+    /// Total unique domains being allowed
+    var totalDomainsAllowed: Int {
+        Set(activeBlocks.filter { !$0.isExpired && $0.mode == .allow }.flatMap { $0.domains }).count
+    }
+
     /// Get currently selected blocklist
     var selectedBlocklist: BlocklistConfig? {
         guard let id = selectedBlocklistId else { return nil }
+        return blocklists.first { $0.id == id }
+    }
+
+    /// Get currently selected allow list
+    var selectedAllowlist: BlocklistConfig? {
+        guard let id = selectedAllowlistId else { return nil }
         return blocklists.first { $0.id == id }
     }
 
@@ -647,7 +710,7 @@ final class WillpowerViewModel {
 
     /// Total unique domains being blocked
     var totalDomainsBlocked: Int {
-        Set(activeBlocks.flatMap { $0.domains }).count
+        Set(activeBlocks.filter { !$0.isExpired && $0.mode == .block }.flatMap { $0.domains }).count
     }
 
     /// Get schedule triggers for a blocklist
@@ -655,16 +718,11 @@ final class WillpowerViewModel {
         blocklist.triggers.filter { $0.type == .scheduleBased }
     }
 
-    /// All schedule triggers across all blocklists
+    /// All schedule triggers across all blocklists (both block and allow modes)
     var allScheduleTriggers: [(blocklist: BlocklistConfig, trigger: TriggerConfig)] {
         blocklists.flatMap { blocklist in
             scheduleTriggers(for: blocklist).map { (blocklist, $0) }
         }
-    }
-
-    /// All enabled independent triggers
-    var allIndependentTriggers: [IndependentTrigger] {
-        independentTriggers
     }
 
     /// Check if the app needs to keep running in background for browser monitoring
