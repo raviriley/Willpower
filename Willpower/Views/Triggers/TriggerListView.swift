@@ -128,17 +128,6 @@ struct TriggerRowView: View {
         }
     }
 
-    /// Formatted daily reset time string
-    var formattedResetTime: String {
-        let date = Calendar.current.date(
-            bySettingHour: trigger.dailyResetHour,
-            minute: trigger.dailyResetMinute,
-            second: 0,
-            of: Date()
-        ) ?? Date()
-        return date.formatted(date: .omitted, time: .shortened)
-    }
-
     var body: some View {
         HStack {
             Image(systemName: isActive ? "exclamationmark.triangle.fill" : "eye.trianglebadge.exclamationmark")
@@ -179,10 +168,6 @@ struct TriggerRowView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-
-                Text("Resets daily at \(formattedResetTime)")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
             }
 
             Spacer()
