@@ -62,7 +62,6 @@ struct AllowlistDetailView: View {
     @State private var domains: [String] = []
     @State private var newDomain: String = ""
     @State private var domainValidationError: String?
-    @State private var originalDomains: Set<String> = []
 
     /// Get the current allow list from viewModel (always fresh)
     var allowlist: BlocklistConfig? {
@@ -81,7 +80,8 @@ struct AllowlistDetailView: View {
     /// Check if a domain can be deleted (only new domains when active)
     func canDeleteDomain(_ domain: String) -> Bool {
         if !isAllowlistActive { return true }
-        return !originalDomains.contains(domain)
+        guard let lockedDomains = activeBlock?.domains else { return false }
+        return !lockedDomains.contains(domain)
     }
 
     /// Independent triggers that target this allow list
@@ -400,7 +400,6 @@ struct AllowlistDetailView: View {
         if let allowlist {
             name = allowlist.name
             domains = allowlist.domains
-            originalDomains = Set(allowlist.domains)
             newDomain = ""
             domainValidationError = nil
         }
@@ -443,7 +442,7 @@ struct AllowlistDetailView: View {
     }
 
     private func applyPreset(_ preset: AllowlistPreset) {
-        if name == "New Allow List" || name.isEmpty {
+        if name == "New Allowlist" || name.isEmpty {
             name = preset.rawValue
         }
         for domain in preset.domains {
