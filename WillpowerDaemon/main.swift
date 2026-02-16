@@ -113,6 +113,9 @@ Task {
             )
             state = updatedState
 
+            // Reset visit counts at configured daily reset time
+            state = performDailyResets(state: state)
+
             // Evaluate triggers and update blocks
             state = evaluateTriggers(
                 state: state,
@@ -393,6 +396,44 @@ func deactivateBlocklist(_ blocklistId: UUID, state: WillpowerState) -> Willpowe
     }
 
     mutableState.lastUpdated = Date()
+    return mutableState
+}
+
+// MARK: - Daily Visit Count Reset
+
+/// Reset visit counts for independent triggers at their configured daily reset time
+func performDailyResets(state: WillpowerState) -> WillpowerState {
+    var mutableState = state
+    let now = Date()
+    let calendar = Calendar.current
+
+    for trigger in mutableState.independentTriggers where trigger.isEnabled {
+        let hour = min(max(trigger.dailyResetHour, 0), 23)
+        let minute = min(max(trigger.dailyResetMinute, 0), 59)
+
+        guard let todayResetTime = calendar.date(
+            bySettingHour: hour, minute: minute, second: 0, of: now
+        ) else { continue }
+
+        // Only reset if we've passed today's reset time
+        guard now >= todayResetTime else { continue }
+
+        for pattern in trigger.urlPatterns {
+            guard let idx = mutableState.visitRecords.firstIndex(where: { $0.patternId == pattern.id }) else {
+                continue
+            }
+
+            // Skip if already reset today (at or after today's reset time)
+            if let lastReset = mutableState.visitRecords[idx].lastDailyResetDate,
+               lastReset >= todayResetTime {
+                continue
+            }
+
+            mutableState.visitRecords[idx].dailyReset()
+            log.info("Daily reset for pattern '\(mutableState.visitRecords[idx].pattern)' (trigger '\(trigger.name)')")
+        }
+    }
+
     return mutableState
 }
 

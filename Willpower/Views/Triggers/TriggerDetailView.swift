@@ -15,6 +15,7 @@ struct TriggerDetailView: View {
     @State private var urlPatterns: [URLPattern] = []
     @State private var maxVisits: Int = 5
     @State private var blockDurationMinutes: Int = 60
+    @State private var dailyResetTime: Date = Calendar.current.date(bySettingHour: 6, minute: 0, second: 0, of: Date()) ?? Date()
 
     @State private var newPattern: String = ""
     @State private var newPatternIsRegex: Bool = false
@@ -134,6 +135,8 @@ struct TriggerDetailView: View {
                             Text("8 hours").tag(480)
                             Text("24 hours").tag(1440)
                         }
+
+                        DatePicker("Daily Reset Time", selection: $dailyResetTime, displayedComponents: .hourAndMinute)
                     }
 
                     // URL Patterns Section
@@ -286,6 +289,9 @@ struct TriggerDetailView: View {
                                         .font(.callout)
                                         .foregroundStyle(.tertiary)
                                 }
+
+                                Text("Visit count resets daily at \(dailyResetTime.formatted(date: .omitted, time: .shortened)).")
+                                    .foregroundStyle(.secondary)
                             } else {
                                 Text("Add URL patterns above to start monitoring.")
                                     .font(.callout)
@@ -306,6 +312,7 @@ struct TriggerDetailView: View {
                 .onChange(of: triggerName) { _, _ in saveIfValid() }
                 .onChange(of: maxVisits) { _, _ in saveIfValid() }
                 .onChange(of: blockDurationMinutes) { _, _ in saveIfValid() }
+                .onChange(of: dailyResetTime) { _, _ in saveIfValid() }
                 .alert("Delete Trigger?", isPresented: $isShowingDeleteConfirmation) {
                     Button("Cancel", role: .cancel) { }
                     Button("Delete", role: .destructive) {
@@ -336,6 +343,12 @@ struct TriggerDetailView: View {
             urlPatterns = trigger.urlPatterns
             maxVisits = trigger.maxVisits
             blockDurationMinutes = trigger.blockDurationSeconds / 60
+            dailyResetTime = Calendar.current.date(
+                bySettingHour: trigger.dailyResetHour,
+                minute: trigger.dailyResetMinute,
+                second: 0,
+                of: Date()
+            ) ?? Date()
             newPattern = ""
             newPatternIsRegex = false
             newPatternBlockAction = .blockDomain
@@ -405,6 +418,8 @@ struct TriggerDetailView: View {
         updated.urlPatterns = urlPatterns
         updated.maxVisits = maxVisits
         updated.blockDurationSeconds = blockDurationMinutes * 60
+        updated.dailyResetHour = Calendar.current.component(.hour, from: dailyResetTime)
+        updated.dailyResetMinute = Calendar.current.component(.minute, from: dailyResetTime)
 
         viewModel.updateIndependentTrigger(updated)
     }

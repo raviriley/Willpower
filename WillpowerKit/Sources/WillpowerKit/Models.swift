@@ -176,6 +176,30 @@ public struct IndependentTrigger: Codable, Sendable, Identifiable, Hashable, Equ
     public var isEnabled: Bool
     public var createdAt: Date
     public var updatedAt: Date
+    /// Hour of day (0-23) when visit counts reset
+    public var dailyResetHour: Int
+    /// Minute of hour (0-59) when visit counts reset
+    public var dailyResetMinute: Int
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, urlPatterns, maxVisits, blockDurationSeconds
+        case isEnabled, createdAt, updatedAt
+        case dailyResetHour, dailyResetMinute
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        urlPatterns = try container.decode([URLPattern].self, forKey: .urlPatterns)
+        maxVisits = try container.decode(Int.self, forKey: .maxVisits)
+        blockDurationSeconds = try container.decode(Int.self, forKey: .blockDurationSeconds)
+        isEnabled = try container.decode(Bool.self, forKey: .isEnabled)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        updatedAt = try container.decode(Date.self, forKey: .updatedAt)
+        dailyResetHour = try container.decodeIfPresent(Int.self, forKey: .dailyResetHour) ?? 6
+        dailyResetMinute = try container.decodeIfPresent(Int.self, forKey: .dailyResetMinute) ?? 0
+    }
 
     public init(
         id: UUID = UUID(),
@@ -185,7 +209,9 @@ public struct IndependentTrigger: Codable, Sendable, Identifiable, Hashable, Equ
         blockDurationSeconds: Int,
         isEnabled: Bool = true,
         createdAt: Date = Date(),
-        updatedAt: Date = Date()
+        updatedAt: Date = Date(),
+        dailyResetHour: Int = 6,
+        dailyResetMinute: Int = 0
     ) {
         self.id = id
         self.name = name
@@ -195,6 +221,8 @@ public struct IndependentTrigger: Codable, Sendable, Identifiable, Hashable, Equ
         self.isEnabled = isEnabled
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+        self.dailyResetHour = dailyResetHour
+        self.dailyResetMinute = dailyResetMinute
     }
 }
 
@@ -347,6 +375,23 @@ public struct VisitRecord: Codable, Sendable, Identifiable, Equatable {
     public var lastVisitAt: Date
     /// When tracking started (for reset interval calculation)
     public var firstVisitAt: Date
+    /// When the last scheduled daily reset occurred (nil = never reset)
+    public var lastDailyResetDate: Date?
+
+    private enum CodingKeys: String, CodingKey {
+        case id, patternId, pattern, visitCount, lastVisitAt, firstVisitAt, lastDailyResetDate
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        patternId = try container.decode(UUID.self, forKey: .patternId)
+        pattern = try container.decode(String.self, forKey: .pattern)
+        visitCount = try container.decode(Int.self, forKey: .visitCount)
+        lastVisitAt = try container.decode(Date.self, forKey: .lastVisitAt)
+        firstVisitAt = try container.decode(Date.self, forKey: .firstVisitAt)
+        lastDailyResetDate = try container.decodeIfPresent(Date.self, forKey: .lastDailyResetDate)
+    }
 
     public init(
         id: UUID = UUID(),
@@ -354,7 +399,8 @@ public struct VisitRecord: Codable, Sendable, Identifiable, Equatable {
         pattern: String,
         visitCount: Int = 0,
         lastVisitAt: Date = Date(),
-        firstVisitAt: Date = Date()
+        firstVisitAt: Date = Date(),
+        lastDailyResetDate: Date? = nil
     ) {
         self.id = id
         self.patternId = patternId
@@ -362,6 +408,7 @@ public struct VisitRecord: Codable, Sendable, Identifiable, Equatable {
         self.visitCount = visitCount
         self.lastVisitAt = lastVisitAt
         self.firstVisitAt = firstVisitAt
+        self.lastDailyResetDate = lastDailyResetDate
     }
 
     /// Increment visit count
@@ -375,6 +422,12 @@ public struct VisitRecord: Codable, Sendable, Identifiable, Equatable {
         visitCount = 0
         firstVisitAt = Date()
         lastVisitAt = Date()
+    }
+
+    /// Reset the visit count as part of a scheduled daily reset
+    public mutating func dailyReset() {
+        reset()
+        lastDailyResetDate = Date()
     }
 }
 
