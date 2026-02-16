@@ -96,36 +96,42 @@ Task {
     var lastHeartbeat = Date()
 
     while true {
+        let now = Date()
+
+        // Update heartbeat periodically
+        if now.timeIntervalSince(lastHeartbeat) >= heartbeatInterval {
+            ipcManager.updateDaemonHeartbeat()
+            lastHeartbeat = now
+        }
+
+        // Process pending commands from app (includes visit reports)
+        // Isolated so failures (e.g. undecodable commands) don't block daily resets or trigger evaluation
+        var configChanged = false
         do {
-            let now = Date()
-
-            // Update heartbeat periodically
-            if now.timeIntervalSince(lastHeartbeat) >= heartbeatInterval {
-                ipcManager.updateDaemonHeartbeat()
-                lastHeartbeat = now
-            }
-
-            // Process pending commands from app (includes visit reports)
-            // Returns updated state and whether configuration changed (blocklists/triggers)
-            let (updatedState, configChanged) = try await processCommands(
+            let (updatedState, changed) = try await processCommands(
                 ipcManager: ipcManager,
                 state: state
             )
             state = updatedState
+            configChanged = changed
+        } catch {
+            log.error("Error processing commands: \(error)")
+        }
 
-            // Reset visit counts at configured daily reset time
-            state = performDailyResets(state: state)
+        // Reset visit counts at configured daily reset time
+        state = performDailyResets(state: state)
 
-            // Evaluate triggers and update blocks
-            state = evaluateTriggers(
-                state: state,
-                triggerEvaluator: triggerEvaluator
-            )
+        // Evaluate triggers and update blocks
+        state = evaluateTriggers(
+            state: state,
+            triggerEvaluator: triggerEvaluator
+        )
 
-            // Clean up expired blocks
-            state = cleanupExpiredBlocks(state: state)
+        // Clean up expired blocks
+        state = cleanupExpiredBlocks(state: state)
 
-            // Apply dual-layer blocking (hosts file + pf firewall)
+        // Apply dual-layer blocking and save state
+        do {
             try applyBlocks(
                 state: state,
                 hostsManager: hostsManager,
@@ -134,7 +140,6 @@ Task {
 
             // Save state (backup only when config changed to preserve blocklist/trigger data)
             try ipcManager.saveState(state, backupFirst: configChanged)
-
         } catch {
             log.error("Error in run loop: \(error)")
         }
