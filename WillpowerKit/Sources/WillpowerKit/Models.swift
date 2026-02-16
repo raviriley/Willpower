@@ -389,6 +389,23 @@ public struct VisitRecord: Codable, Sendable, Identifiable, Equatable {
     public var lastVisitAt: Date
     /// When tracking started (for reset interval calculation)
     public var firstVisitAt: Date
+    /// When the last scheduled daily reset occurred (nil = never reset)
+    public var lastDailyResetDate: Date?
+
+    private enum CodingKeys: String, CodingKey {
+        case id, patternId, pattern, visitCount, lastVisitAt, firstVisitAt, lastDailyResetDate
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        patternId = try container.decode(UUID.self, forKey: .patternId)
+        pattern = try container.decode(String.self, forKey: .pattern)
+        visitCount = try container.decode(Int.self, forKey: .visitCount)
+        lastVisitAt = try container.decode(Date.self, forKey: .lastVisitAt)
+        firstVisitAt = try container.decode(Date.self, forKey: .firstVisitAt)
+        lastDailyResetDate = try container.decodeIfPresent(Date.self, forKey: .lastDailyResetDate)
+    }
 
     public init(
         id: UUID = UUID(),
@@ -396,7 +413,8 @@ public struct VisitRecord: Codable, Sendable, Identifiable, Equatable {
         pattern: String,
         visitCount: Int = 0,
         lastVisitAt: Date = Date(),
-        firstVisitAt: Date = Date()
+        firstVisitAt: Date = Date(),
+        lastDailyResetDate: Date? = nil
     ) {
         self.id = id
         self.patternId = patternId
@@ -404,6 +422,7 @@ public struct VisitRecord: Codable, Sendable, Identifiable, Equatable {
         self.visitCount = visitCount
         self.lastVisitAt = lastVisitAt
         self.firstVisitAt = firstVisitAt
+        self.lastDailyResetDate = lastDailyResetDate
     }
 
     /// Increment visit count
@@ -417,6 +436,12 @@ public struct VisitRecord: Codable, Sendable, Identifiable, Equatable {
         visitCount = 0
         firstVisitAt = Date()
         lastVisitAt = Date()
+    }
+
+    /// Reset the visit count as part of a scheduled daily reset
+    public mutating func dailyReset() {
+        reset()
+        lastDailyResetDate = Date()
     }
 }
 
@@ -436,6 +461,29 @@ public struct WillpowerState: Codable, Sendable {
     public var lastUpdated: Date
     /// Daemon version for compatibility checking
     public var daemonVersion: String
+    /// Global hour of day (0-23) when all visit counts reset
+    public var dailyResetHour: Int
+    /// Global minute of hour (0-59) when all visit counts reset
+    public var dailyResetMinute: Int
+
+    private enum CodingKeys: String, CodingKey {
+        case blocklists, independentTriggers, activeBlocks, visitRecords
+        case lastUpdated, daemonVersion, dailyResetHour, dailyResetMinute
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        blocklists = try container.decode([BlocklistConfig].self, forKey: .blocklists)
+        independentTriggers = try container.decode([IndependentTrigger].self, forKey: .independentTriggers)
+        activeBlocks = try container.decode([ActiveBlock].self, forKey: .activeBlocks)
+        visitRecords = try container.decode([VisitRecord].self, forKey: .visitRecords)
+        lastUpdated = try container.decode(Date.self, forKey: .lastUpdated)
+        daemonVersion = try container.decode(String.self, forKey: .daemonVersion)
+        let decodedHour = try container.decodeIfPresent(Int.self, forKey: .dailyResetHour) ?? 5
+        let decodedMinute = try container.decodeIfPresent(Int.self, forKey: .dailyResetMinute) ?? 0
+        dailyResetHour = min(max(decodedHour, 0), 23)
+        dailyResetMinute = min(max(decodedMinute, 0), 59)
+    }
 
     public init(
         blocklists: [BlocklistConfig] = [],
@@ -443,7 +491,9 @@ public struct WillpowerState: Codable, Sendable {
         activeBlocks: [ActiveBlock] = [],
         visitRecords: [VisitRecord] = [],
         lastUpdated: Date = Date(),
-        daemonVersion: String = "1.0.0"
+        daemonVersion: String = "1.0.0",
+        dailyResetHour: Int = 5,
+        dailyResetMinute: Int = 0
     ) {
         self.blocklists = blocklists
         self.independentTriggers = independentTriggers
@@ -451,6 +501,8 @@ public struct WillpowerState: Codable, Sendable {
         self.visitRecords = visitRecords
         self.lastUpdated = lastUpdated
         self.daemonVersion = daemonVersion
+        self.dailyResetHour = dailyResetHour
+        self.dailyResetMinute = dailyResetMinute
     }
 
     /// Get all domains currently being blocked (from .block mode active blocks only)
@@ -495,6 +547,8 @@ public enum DaemonCommand: Codable, Sendable {
     case forceSync
     /// Report a URL visit from the app (app runs BrowserMonitor since it has user session)
     case reportVisit(patternId: UUID, url: String)
+    /// Update the global daily visit counter reset time
+    case updateDailyResetTime(hour: Int, minute: Int)
 }
 
 // MARK: - Command Wrapper

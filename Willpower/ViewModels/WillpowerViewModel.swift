@@ -55,6 +55,11 @@ final class WillpowerViewModel {
     /// Visit tracking records
     var visitRecords: [VisitRecord] = []
 
+    /// Global daily visit counter reset time (hour 0-23)
+    var dailyResetHour: Int = 5
+    /// Global daily visit counter reset time (minute 0-59)
+    var dailyResetMinute: Int = 0
+
     /// Daemon status
     var isDaemonRunning: Bool = false
     var lastDaemonHeartbeat: Date?
@@ -107,6 +112,9 @@ final class WillpowerViewModel {
     private let localBlocklistsKey = "willpower.local.blocklists"
     /// Local storage key for independent triggers
     private let localTriggersKey = "willpower.local.triggers"
+    /// Local storage keys for global daily reset time
+    private let localDailyResetHourKey = "willpower.local.dailyResetHour"
+    private let localDailyResetMinuteKey = "willpower.local.dailyResetMinute"
 
     /// Tracks blocklist IDs with pending optimistic blocks (not yet confirmed by daemon)
     /// Used to prevent syncState() from overwriting optimistic updates before daemon processes them
@@ -121,6 +129,9 @@ final class WillpowerViewModel {
 
         // Load initial state from local storage
         loadLocalState()
+
+        // Sync daily reset time to daemon on startup
+        try? ipcManager.updateDailyResetTime(hour: dailyResetHour, minute: dailyResetMinute)
 
         // Setup browser monitor callback
         Task {
@@ -153,6 +164,11 @@ final class WillpowerViewModel {
            let saved = try? JSONDecoder().decode([IndependentTrigger].self, from: data) {
             independentTriggers = saved
         }
+        let defaults = UserDefaults.standard
+        if defaults.object(forKey: localDailyResetHourKey) != nil {
+            dailyResetHour = defaults.integer(forKey: localDailyResetHourKey)
+            dailyResetMinute = defaults.integer(forKey: localDailyResetMinuteKey)
+        }
     }
 
     private func saveLocalState() {
@@ -162,6 +178,8 @@ final class WillpowerViewModel {
         if let data = try? JSONEncoder().encode(independentTriggers) {
             UserDefaults.standard.set(data, forKey: localTriggersKey)
         }
+        UserDefaults.standard.set(dailyResetHour, forKey: localDailyResetHourKey)
+        UserDefaults.standard.set(dailyResetMinute, forKey: localDailyResetMinuteKey)
     }
 
     // MARK: - State Synchronization
@@ -606,6 +624,21 @@ final class WillpowerViewModel {
         } catch {
             // Log but don't show error to user - local state is saved
             logger.error("IPC trigger sync failed: \(error.localizedDescription)")
+        }
+    }
+
+    // MARK: - Daily Reset Time
+
+    /// Update the global daily visit counter reset time
+    func updateDailyResetTime(hour: Int, minute: Int) {
+        dailyResetHour = hour
+        dailyResetMinute = minute
+        saveLocalState()
+
+        do {
+            try ipcManager.updateDailyResetTime(hour: hour, minute: minute)
+        } catch {
+            logger.error("IPC daily reset time sync failed: \(error.localizedDescription)")
         }
     }
 

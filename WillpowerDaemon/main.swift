@@ -3,7 +3,7 @@ import WillpowerKit
 
 // MARK: - Configuration
 
-private let daemonVersion = "1.0.5"  // Allow list support
+private let daemonVersion = "1.0.6"  // Global daily visit reset
 private let runLoopInterval: TimeInterval = 5.0
 private let heartbeatInterval: TimeInterval = 5.0
 
@@ -97,33 +97,42 @@ Task {
     var lastHeartbeat = Date()
 
     while true {
+        let now = Date()
+
+        // Update heartbeat periodically
+        if now.timeIntervalSince(lastHeartbeat) >= heartbeatInterval {
+            ipcManager.updateDaemonHeartbeat()
+            lastHeartbeat = now
+        }
+
+        // Process pending commands from app (includes visit reports)
+        // Isolated so failures (e.g. undecodable commands) don't block daily resets or trigger evaluation
+        var configChanged = false
         do {
-            let now = Date()
-
-            // Update heartbeat periodically
-            if now.timeIntervalSince(lastHeartbeat) >= heartbeatInterval {
-                ipcManager.updateDaemonHeartbeat()
-                lastHeartbeat = now
-            }
-
-            // Process pending commands from app (includes visit reports)
-            // Returns updated state and whether configuration changed (blocklists/triggers)
-            let (updatedState, configChanged) = try await processCommands(
+            let (updatedState, changed) = try await processCommands(
                 ipcManager: ipcManager,
                 state: state
             )
             state = updatedState
+            configChanged = changed
+        } catch {
+            log.error("Error processing commands: \(error)")
+        }
 
-            // Evaluate triggers and update blocks
-            state = evaluateTriggers(
-                state: state,
-                triggerEvaluator: triggerEvaluator
-            )
+        // Reset visit counts at configured daily reset time
+        state = performDailyResets(state: state)
 
-            // Clean up expired blocks
-            state = cleanupExpiredBlocks(state: state)
+        // Evaluate triggers and update blocks
+        state = evaluateTriggers(
+            state: state,
+            triggerEvaluator: triggerEvaluator
+        )
 
-            // Apply dual-layer blocking (hosts file + pf firewall)
+        // Clean up expired blocks
+        state = cleanupExpiredBlocks(state: state)
+
+        // Apply dual-layer blocking and save state
+        do {
             try applyBlocks(
                 state: state,
                 hostsManager: hostsManager,
@@ -132,7 +141,6 @@ Task {
 
             // Save state (backup only when config changed to preserve blocklist/trigger data)
             try ipcManager.saveState(state, backupFirst: configChanged)
-
         } catch {
             log.error("Error in run loop: \(error)")
         }
@@ -291,6 +299,13 @@ func processCommands(
                 configChanged = true  // Trigger deleted - backup needed
             }
             mutableState.lastUpdated = Date()
+
+        case .updateDailyResetTime(let hour, let minute):
+            mutableState.dailyResetHour = min(max(hour, 0), 23)
+            mutableState.dailyResetMinute = min(max(minute, 0), 59)
+            mutableState.lastUpdated = Date()
+            configChanged = true
+            log.info("Updated global daily reset time to \(mutableState.dailyResetHour):\(String(format: "%02d", mutableState.dailyResetMinute))")
         }
 
         try ipcManager.markCommandProcessed(wrapper.id)
@@ -396,6 +411,44 @@ func deactivateBlocklist(_ blocklistId: UUID, state: WillpowerState) -> Willpowe
     }
 
     mutableState.lastUpdated = Date()
+    return mutableState
+}
+
+// MARK: - Daily Visit Count Reset
+
+/// Reset visit counts for all enabled independent triggers at the global daily reset time
+func performDailyResets(state: WillpowerState) -> WillpowerState {
+    var mutableState = state
+    let now = Date()
+    let calendar = Calendar.current
+
+    let hour = min(max(state.dailyResetHour, 0), 23)
+    let minute = min(max(state.dailyResetMinute, 0), 59)
+
+    guard let todayResetTime = calendar.date(
+        bySettingHour: hour, minute: minute, second: 0, of: now
+    ) else { return mutableState }
+
+    // Only reset if we've passed today's reset time
+    guard now >= todayResetTime else { return mutableState }
+
+    for trigger in mutableState.independentTriggers where trigger.isEnabled {
+        for pattern in trigger.urlPatterns {
+            guard let idx = mutableState.visitRecords.firstIndex(where: { $0.patternId == pattern.id }) else {
+                continue
+            }
+
+            // Skip if already reset today (at or after today's reset time)
+            if let lastReset = mutableState.visitRecords[idx].lastDailyResetDate,
+               lastReset >= todayResetTime {
+                continue
+            }
+
+            mutableState.visitRecords[idx].dailyReset()
+            log.info("Daily reset for pattern '\(mutableState.visitRecords[idx].pattern)' (trigger '\(trigger.name)')")
+        }
+    }
+
     return mutableState
 }
 

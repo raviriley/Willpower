@@ -153,11 +153,11 @@ struct TriggerRowView: View {
                     Text("\(totalVisits)/\(trigger.maxVisits) visits")
                         .font(.caption)
                         .foregroundStyle(visitCountColor(current: totalVisits, max: trigger.maxVisits))
-                    
+
                     Text("→")
                         .font(.caption)
                         .foregroundStyle(.tertiary)
-                    
+
                     if isActive {
                         Text("blocking")
                             .font(.caption)

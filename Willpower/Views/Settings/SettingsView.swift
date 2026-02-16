@@ -22,6 +22,7 @@ struct SettingsView: View {
     @State private var isShowingExportSheet = false
     @State private var isShowingImportSheet = false
     @State private var launchAtLogin = false
+    @State private var dailyResetTime: Date = Calendar.current.date(bySettingHour: 5, minute: 0, second: 0, of: Date()) ?? Date()
 
     var body: some View {
         Form {
@@ -85,10 +86,17 @@ struct SettingsView: View {
                 .onChange(of: launchAtLogin) { _, newValue in
                     setLaunchAtLogin(newValue)
                 }
+
+                DatePicker("Daily Visit Reset", selection: $dailyResetTime, displayedComponents: .hourAndMinute)
+                    .onChange(of: dailyResetTime) { _, newValue in
+                        let hour = Calendar.current.component(.hour, from: newValue)
+                        let minute = Calendar.current.component(.minute, from: newValue)
+                        viewModel.updateDailyResetTime(hour: hour, minute: minute)
+                    }
             } header: {
                 Text("Preferences")
             } footer: {
-                Text("Willpower runs in the menu bar to monitor browser visits. Click the shield icon to open the main window.")
+                Text("Visit counts for all triggers reset daily at this time.")
             }
 
             // MARK: - Data Section
@@ -185,6 +193,12 @@ struct SettingsView: View {
         .navigationTitle("Settings")
         .onAppear {
             loadLaunchAtLoginState()
+            dailyResetTime = Calendar.current.date(
+                bySettingHour: viewModel.dailyResetHour,
+                minute: viewModel.dailyResetMinute,
+                second: 0,
+                of: Date()
+            ) ?? Date()
         }
         .alert("Reset All Data?", isPresented: $isShowingResetConfirmation) {
             Button("Cancel", role: .cancel) { }

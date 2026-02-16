@@ -399,6 +399,11 @@ public final class IPCManager: @unchecked Sendable {
         try queueCommand(.deleteIndependentTrigger(triggerId: triggerId))
     }
 
+    /// Update the global daily visit counter reset time
+    public func updateDailyResetTime(hour: Int, minute: Int) throws {
+        try queueCommand(.updateDailyResetTime(hour: hour, minute: minute))
+    }
+
     // MARK: - Debug
 
     /// Get debug description of current IPC state

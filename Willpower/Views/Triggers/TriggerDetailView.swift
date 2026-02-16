@@ -72,6 +72,17 @@ struct TriggerDetailView: View {
         }
     }
 
+    /// Formatted global daily reset time from Settings
+    var globalResetTimeFormatted: String {
+        let date = Calendar.current.date(
+            bySettingHour: viewModel.dailyResetHour,
+            minute: viewModel.dailyResetMinute,
+            second: 0,
+            of: Date()
+        ) ?? Date()
+        return date.formatted(date: .omitted, time: .shortened)
+    }
+
     /// Formatted duration string for display
     var formattedDuration: String {
         formatDuration(blockDurationMinutes * 60)
@@ -286,6 +297,9 @@ struct TriggerDetailView: View {
                                         .font(.callout)
                                         .foregroundStyle(.tertiary)
                                 }
+
+                                Text("Visit count resets daily at \(globalResetTimeFormatted).")
+                                    .foregroundStyle(.secondary)
                             } else {
                                 Text("Add URL patterns above to start monitoring.")
                                     .font(.callout)
