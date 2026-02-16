@@ -608,14 +608,19 @@ func applyBlocks(
 
     log.info("Block state changed. Blocking \(blockedDomains.count) domain(s), allowing \(allowedDomains.count) domain(s), allowList=\(isAllowListActive)")
 
+    // Track success of each layer so we can retry on next iteration if either fails
+    var allLayersSucceeded = true
+
     // LAYER 1: Hosts file blocking (block-mode domains only — allow list handled by PF)
     do {
         try hostsManager.applyBlocklistAndFlush(domains: Array(blockedDomains))
         log.info("Layer 1: Hosts file updated")
     } catch HostsManager.HostsError.permissionDenied {
         log.error("Layer 1: Hosts file - permission denied (not running as root)")
+        allLayersSucceeded = false
     } catch {
         log.error("Layer 1: Hosts file error - \(error)")
+        allLayersSucceeded = false
     }
 
     // LAYER 2: PF firewall (unified rules for both block and allow modes)
@@ -628,11 +633,17 @@ func applyBlocks(
         log.info("Layer 2: PF firewall rules applied")
     } catch PacketFilterManager.PFError.permissionDenied {
         log.error("Layer 2: PF firewall - permission denied (not running as root)")
+        allLayersSucceeded = false
     } catch {
         log.error("Layer 2: PF firewall error - \(error)")
+        allLayersSucceeded = false
     }
 
-    // Update tracking
-    previousBlockedDomains = blockedDomains
-    previousAllowedDomains = allowedDomains
+    // Only update tracking if both layers succeeded.
+    // If either failed, leave tracking stale so the next iteration
+    // re-enters this function and retries both layers.
+    if allLayersSucceeded {
+        previousBlockedDomains = blockedDomains
+        previousAllowedDomains = allowedDomains
+    }
 }
