@@ -3,7 +3,7 @@ import WillpowerKit
 
 // MARK: - Configuration
 
-private let daemonVersion = "1.0.5"  // Allow list support
+private let daemonVersion = "1.0.6"  // Global daily visit reset
 private let runLoopInterval: TimeInterval = 5.0
 private let heartbeatInterval: TimeInterval = 5.0
 
