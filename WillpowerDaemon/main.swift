@@ -293,6 +293,13 @@ func processCommands(
                 configChanged = true  // Trigger deleted - backup needed
             }
             mutableState.lastUpdated = Date()
+
+        case .updateDailyResetTime(let hour, let minute):
+            mutableState.dailyResetHour = min(max(hour, 0), 23)
+            mutableState.dailyResetMinute = min(max(minute, 0), 59)
+            mutableState.lastUpdated = Date()
+            configChanged = true
+            log.info("Updated global daily reset time to \(mutableState.dailyResetHour):\(String(format: "%02d", mutableState.dailyResetMinute))")
         }
 
         try ipcManager.markCommandProcessed(wrapper.id)
@@ -401,23 +408,23 @@ func deactivateBlocklist(_ blocklistId: UUID, state: WillpowerState) -> Willpowe
 
 // MARK: - Daily Visit Count Reset
 
-/// Reset visit counts for independent triggers at their configured daily reset time
+/// Reset visit counts for all enabled independent triggers at the global daily reset time
 func performDailyResets(state: WillpowerState) -> WillpowerState {
     var mutableState = state
     let now = Date()
     let calendar = Calendar.current
 
+    let hour = min(max(state.dailyResetHour, 0), 23)
+    let minute = min(max(state.dailyResetMinute, 0), 59)
+
+    guard let todayResetTime = calendar.date(
+        bySettingHour: hour, minute: minute, second: 0, of: now
+    ) else { return mutableState }
+
+    // Only reset if we've passed today's reset time
+    guard now >= todayResetTime else { return mutableState }
+
     for trigger in mutableState.independentTriggers where trigger.isEnabled {
-        let hour = min(max(trigger.dailyResetHour, 0), 23)
-        let minute = min(max(trigger.dailyResetMinute, 0), 59)
-
-        guard let todayResetTime = calendar.date(
-            bySettingHour: hour, minute: minute, second: 0, of: now
-        ) else { continue }
-
-        // Only reset if we've passed today's reset time
-        guard now >= todayResetTime else { continue }
-
         for pattern in trigger.urlPatterns {
             guard let idx = mutableState.visitRecords.firstIndex(where: { $0.patternId == pattern.id }) else {
                 continue
