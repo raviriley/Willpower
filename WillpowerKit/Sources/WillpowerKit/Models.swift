@@ -176,32 +176,6 @@ public struct IndependentTrigger: Codable, Sendable, Identifiable, Hashable, Equ
     public var isEnabled: Bool
     public var createdAt: Date
     public var updatedAt: Date
-    /// Hour of day (0-23) when visit counts reset
-    public var dailyResetHour: Int
-    /// Minute of hour (0-59) when visit counts reset
-    public var dailyResetMinute: Int
-
-    private enum CodingKeys: String, CodingKey {
-        case id, name, urlPatterns, maxVisits, blockDurationSeconds
-        case isEnabled, createdAt, updatedAt
-        case dailyResetHour, dailyResetMinute
-    }
-
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        id = try container.decode(UUID.self, forKey: .id)
-        name = try container.decode(String.self, forKey: .name)
-        urlPatterns = try container.decode([URLPattern].self, forKey: .urlPatterns)
-        maxVisits = try container.decode(Int.self, forKey: .maxVisits)
-        blockDurationSeconds = try container.decode(Int.self, forKey: .blockDurationSeconds)
-        isEnabled = try container.decode(Bool.self, forKey: .isEnabled)
-        createdAt = try container.decode(Date.self, forKey: .createdAt)
-        updatedAt = try container.decode(Date.self, forKey: .updatedAt)
-        let decodedHour = try container.decodeIfPresent(Int.self, forKey: .dailyResetHour) ?? 6
-        let decodedMinute = try container.decodeIfPresent(Int.self, forKey: .dailyResetMinute) ?? 0
-        dailyResetHour = min(max(decodedHour, 0), 23)
-        dailyResetMinute = min(max(decodedMinute, 0), 59)
-    }
 
     public init(
         id: UUID = UUID(),
@@ -211,9 +185,7 @@ public struct IndependentTrigger: Codable, Sendable, Identifiable, Hashable, Equ
         blockDurationSeconds: Int,
         isEnabled: Bool = true,
         createdAt: Date = Date(),
-        updatedAt: Date = Date(),
-        dailyResetHour: Int = 6,
-        dailyResetMinute: Int = 0
+        updatedAt: Date = Date()
     ) {
         self.id = id
         self.name = name
@@ -223,8 +195,6 @@ public struct IndependentTrigger: Codable, Sendable, Identifiable, Hashable, Equ
         self.isEnabled = isEnabled
         self.createdAt = createdAt
         self.updatedAt = updatedAt
-        self.dailyResetHour = dailyResetHour
-        self.dailyResetMinute = dailyResetMinute
     }
 }
 
@@ -449,6 +419,29 @@ public struct WillpowerState: Codable, Sendable {
     public var lastUpdated: Date
     /// Daemon version for compatibility checking
     public var daemonVersion: String
+    /// Global hour of day (0-23) when all visit counts reset
+    public var dailyResetHour: Int
+    /// Global minute of hour (0-59) when all visit counts reset
+    public var dailyResetMinute: Int
+
+    private enum CodingKeys: String, CodingKey {
+        case blocklists, independentTriggers, activeBlocks, visitRecords
+        case lastUpdated, daemonVersion, dailyResetHour, dailyResetMinute
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        blocklists = try container.decode([BlocklistConfig].self, forKey: .blocklists)
+        independentTriggers = try container.decode([IndependentTrigger].self, forKey: .independentTriggers)
+        activeBlocks = try container.decode([ActiveBlock].self, forKey: .activeBlocks)
+        visitRecords = try container.decode([VisitRecord].self, forKey: .visitRecords)
+        lastUpdated = try container.decode(Date.self, forKey: .lastUpdated)
+        daemonVersion = try container.decode(String.self, forKey: .daemonVersion)
+        let decodedHour = try container.decodeIfPresent(Int.self, forKey: .dailyResetHour) ?? 5
+        let decodedMinute = try container.decodeIfPresent(Int.self, forKey: .dailyResetMinute) ?? 0
+        dailyResetHour = min(max(decodedHour, 0), 23)
+        dailyResetMinute = min(max(decodedMinute, 0), 59)
+    }
 
     public init(
         blocklists: [BlocklistConfig] = [],
@@ -456,7 +449,9 @@ public struct WillpowerState: Codable, Sendable {
         activeBlocks: [ActiveBlock] = [],
         visitRecords: [VisitRecord] = [],
         lastUpdated: Date = Date(),
-        daemonVersion: String = "1.0.0"
+        daemonVersion: String = "1.0.0",
+        dailyResetHour: Int = 5,
+        dailyResetMinute: Int = 0
     ) {
         self.blocklists = blocklists
         self.independentTriggers = independentTriggers
@@ -464,6 +459,8 @@ public struct WillpowerState: Codable, Sendable {
         self.visitRecords = visitRecords
         self.lastUpdated = lastUpdated
         self.daemonVersion = daemonVersion
+        self.dailyResetHour = dailyResetHour
+        self.dailyResetMinute = dailyResetMinute
     }
 
     /// Get all domains currently being blocked
@@ -494,6 +491,8 @@ public enum DaemonCommand: Codable, Sendable {
     case forceSync
     /// Report a URL visit from the app (app runs BrowserMonitor since it has user session)
     case reportVisit(patternId: UUID, url: String)
+    /// Update the global daily visit counter reset time
+    case updateDailyResetTime(hour: Int, minute: Int)
 }
 
 // MARK: - Command Wrapper
