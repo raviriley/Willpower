@@ -30,6 +30,7 @@ struct WillpowerApp: App {
                 .onAppear {
                     // Configure AppDelegate with our viewModel
                     appDelegate.configure(with: viewModel)
+                    viewModel.daemonManager = daemonManager
                     daemonManager.refreshStatus()
 
                     if !hasCompletedOnboarding {
