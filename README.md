@@ -1,8 +1,8 @@
 # Willpower
 
-Willpower is a macOS app that gives you the willpower to resist distractions and focus on what matters. Simply add sites to a blocklist and click "Activate Now" to start blocking them.
+Willpower is a macOS app that gives you the willpower to resist distractions and focus on what matters. Simply add sites to a blocklist and click "Activate Now" to start blocking them. Or flip it around and create an allowlist to permit only the sites you need while blocking everything else.
 
-You can also set up scheduled blocking sessions, create blocklists for different contexts, and configure visit-count triggers that automatically restrict access after you've visited a site too many times.
+You can also set up scheduled blocking sessions, create blocklists and allowlists for different contexts, and configure visit-count triggers that automatically restrict access after you've visited a site too many times.
 
 Willpower is free and open source. Inspired by [SelfControl](https://github.com/SelfControlApp/selfcontrol).
 
@@ -20,10 +20,11 @@ See [DEVELOPMENT.md](DEVELOPMENT.md) for instructions on building from source an
 
 ## Features
 
-- Schedule-based and manual activation of blocklists
+- **Blocklists**: Block distracting sites. Pick from presets or create your own.
+- **Allowlists**: Allow only the sites you need and block everything else.
+- Schedule-based and manual activation of blocklists and allowlists
 - Browser URL monitoring for visit-count triggers on all modern browsers (supports Safari, Chrome, Chromium-based browsers (Arc, Brave, Edge, etc.), and Firefox)
 - Unbreakable blocking: you won't be able to access blocked sites even if you restart your computer or delete the app.
-- Blocklist presets for common categories (social media, news, streaming, gaming)
 
 ## Known Limitations
 
