@@ -101,6 +101,19 @@ struct AllowlistDetailView: View {
         Group {
             if let allowlist {
                 Form {
+                    // Caution banner
+                    Section {
+                        HStack(spacing: 12) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.orange)
+                                .font(.title3)
+                            Text("An active allow list blocks **all** websites except the ones listed below. Make sure you've added every domain you need before activating.")
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.vertical, 4)
+                    }
+
                     // Name Section
                     Section("Name") {
                         TextField("Allow List Name", text: $name)
