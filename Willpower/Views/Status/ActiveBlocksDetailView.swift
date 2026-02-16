@@ -96,7 +96,8 @@ struct BlocklistBlockView: View {
             reason: block.reason,
             domains: block.domains,
             expiresAt: block.expiresAt,
-            isLocked: block.isLocked
+            isLocked: block.isLocked,
+            isAllowList: block.mode == .allow
         )
     }
 }
@@ -109,6 +110,7 @@ struct ActiveBlockCard: View {
     let domains: [String]
     let expiresAt: Date?
     let isLocked: Bool
+    var isAllowList: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -117,7 +119,11 @@ struct ActiveBlockCard: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(title)
                         .font(.headline)
-                    ReasonBadge(reason: reason)
+                    if isAllowList {
+                        StatusBadge(text: "ALLOW LIST", color: .green)
+                    } else {
+                        ReasonBadge(reason: reason)
+                    }
                 }
 
                 Spacer()
@@ -138,7 +144,7 @@ struct ActiveBlockCard: View {
 
                     StatusBadge(
                         text: isLocked ? "LOCKED" : "ACTIVE",
-                        color: isLocked ? .red : .orange
+                        color: isLocked ? .red : (isAllowList ? .green : .orange)
                     )
                 }
             }
@@ -148,11 +154,29 @@ struct ActiveBlockCard: View {
                 .padding(.vertical, 10)
 
             // Domains list
+            if isAllowList {
+                Text("\(domains.count) domain\(domains.count == 1 ? "" : "s") allowed")
+                    .font(.callout)
+                    .foregroundStyle(.green)
+                    .padding(.bottom, 4)
+            }
             DomainsListView(domains: domains)
         }
         .padding()
-        .background(.background.secondary)
+        .background {
+            if isAllowList {
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color.green.opacity(0.05))
+            } else {
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(.background.secondary)
+            }
+        }
         .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(isAllowList ? Color.green.opacity(0.3) : .clear, lineWidth: 1)
+        )
     }
 }
 

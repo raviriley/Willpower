@@ -51,6 +51,18 @@ struct SettingsView: View {
                         .buttonStyle(.bordered)
                         .controlSize(.small)
                     }
+                } else if let daemonVer = viewModel.daemonVersion, daemonVer != appVersionShort {
+                    HStack {
+                        Text("Daemon version (\(daemonVer)) differs from app (\(appVersionShort))")
+                            .font(.callout)
+                            .foregroundStyle(.orange)
+                        Spacer()
+                        Button("Update Daemon") {
+                            daemonManager.update()
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                    }
                 }
 
                 if let lastHeartbeat = viewModel.lastDaemonHeartbeat {
@@ -143,7 +155,14 @@ struct SettingsView: View {
                 HStack {
                     Label("Blocklists", systemImage: "list.bullet.rectangle")
                     Spacer()
-                    Text("\(viewModel.blocklists.count)")
+                    Text("\(viewModel.regularBlocklists.count)")
+                        .foregroundStyle(.secondary)
+                }
+
+                HStack {
+                    Label("Allowlists", systemImage: "checkmark.shield")
+                    Spacer()
+                    Text("\(viewModel.allowLists.count)")
                         .foregroundStyle(.secondary)
                 }
 
@@ -208,10 +227,13 @@ struct SettingsView: View {
         viewModel.activeBlocks.contains { $0.isLocked && !$0.isExpired }
     }
 
+    private var appVersionShort: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+    }
+
     private var appVersion: String {
-        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
         let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
-        return "\(version) (\(build))"
+        return "\(appVersionShort) (\(build))"
     }
 
     // MARK: - Actions
@@ -273,10 +295,10 @@ struct SettingsView: View {
             return
         }
 
-        // Merge imported blocklists (avoid duplicates by name)
+        // Merge imported blocklists (avoid duplicates by name+mode pair)
         // Import full blocklist including triggers/schedules
         for blocklist in importData.blocklists {
-            if !viewModel.blocklists.contains(where: { $0.name == blocklist.name }) {
+            if !viewModel.blocklists.contains(where: { $0.name == blocklist.name && $0.mode == blocklist.mode }) {
                 viewModel.importBlocklist(blocklist)
             }
         }

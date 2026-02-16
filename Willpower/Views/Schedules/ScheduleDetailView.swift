@@ -67,7 +67,7 @@ struct ScheduleDetailView: View {
         Group {
             if let schedule {
                 Form {
-                    Section("Blocklist") {
+                    Section(schedule.blocklist.mode == .allow ? "Allowlist" : "Blocklist") {
                         LabeledContent("Name", value: schedule.blocklist.name)
                         LabeledContent("Domains", value: "\(schedule.blocklist.domains.count)")
                     }
@@ -170,7 +170,7 @@ struct ScheduleDetailView: View {
                     Section("Days") {
                         WeekdayPicker(selectedDays: $selectedWeekdays)
 
-                        Text("The blocklist will automatically activate during this time window on the selected days.")
+                        Text("The \(schedule.blocklist.mode == .allow ? "allowlist" : "blocklist") will automatically activate during this time window on the selected days.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }

@@ -150,6 +150,35 @@ final class DaemonManager {
         }
     }
 
+    /// Unregister and re-register the daemon to pick up a new binary
+    func update() {
+        lastError = nil
+        logger.info("Updating daemon (unregister + re-register)...")
+
+        let service = SMAppService.daemon(plistName: Self.plistName)
+
+        // Unregister first
+        do {
+            try service.unregister()
+            logger.info("Daemon unregistered for update")
+        } catch {
+            logger.warning("Unregister during update failed (may not be registered): \(error.localizedDescription)")
+        }
+
+        // Small delay to let launchd clean up
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [self] in
+            do {
+                try service.register()
+                logger.info("Daemon re-registered successfully")
+                refreshStatus()
+            } catch {
+                logger.error("Daemon re-registration failed: \(error.localizedDescription)")
+                lastError = error.localizedDescription
+                refreshStatus()
+            }
+        }
+    }
+
     /// Unregister the daemon from launchd
     func unregister() {
         lastError = nil

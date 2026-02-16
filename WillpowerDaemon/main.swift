@@ -3,7 +3,7 @@ import WillpowerKit
 
 // MARK: - Configuration
 
-private let daemonVersion = "1.0.3"  // Standardized logging with os_log
+private let daemonVersion = "1.0.5"  // Allow list support
 private let runLoopInterval: TimeInterval = 5.0
 private let heartbeatInterval: TimeInterval = 5.0
 
@@ -68,9 +68,10 @@ let packetFilterManager = PacketFilterManager()
 let ipcManager = IPCManager(role: .daemon)  // Use daemon role for tighter permissions
 let triggerEvaluator = TriggerEvaluator()
 
-/// Track previous blocked domains to detect changes (must be before dispatchMain)
+/// Track previous blocked/allowed domains to detect changes (must be before dispatchMain)
 /// nil = never synced (force initial sync), empty = synced with no domains
 var previousBlockedDomains: Set<String>?
+var previousAllowedDomains: Set<String>?
 
 // NOTE: BrowserMonitor runs in the app, not the daemon.
 // The daemon runs as root and doesn't have access to user's GUI session
@@ -354,6 +355,7 @@ func activateBlocklist(
     let block = ActiveBlock(
         blocklistId: blocklistId,
         domains: blocklist.domains,
+        mode: blocklist.mode,
         expiresAt: expiresAt,
         reason: reason,
         isLocked: isLocked
@@ -367,7 +369,8 @@ func activateBlocklist(
     mutableState.blocklists[blocklistIdx].isActive = true
     mutableState.lastUpdated = Date()
 
-    log.info("Activated blocklist '\(blocklist.name)' - locked: \(isLocked), expires: \(expiresAt?.description ?? "indefinite")")
+    let modeLabel = blocklist.mode == .allow ? "allow list" : "blocklist"
+    log.info("Activated \(modeLabel) '\(blocklist.name)' - locked: \(isLocked), expires: \(expiresAt?.description ?? "indefinite")")
 
     return mutableState
 }
@@ -435,6 +438,7 @@ func evaluateTriggers(
                     let block = ActiveBlock(
                         blocklistId: blocklist.id,
                         domains: blocklist.domains,
+                        mode: blocklist.mode,
                         expiresAt: expiresAt,
                         reason: .scheduleBasedTrigger,
                         isLocked: true  // Schedule blocks are locked (controlled by schedule)
@@ -471,9 +475,8 @@ func evaluateIndependentTriggers(state: WillpowerState) -> WillpowerState {
 
         // Process each pattern's block action
         for pattern in trigger.urlPatterns {
-            // Check if this pattern already has an active block
-            let patternBlockId = pattern.id  // Use pattern ID as block identifier
-            if mutableState.activeBlocks.contains(where: { $0.blocklistId == patternBlockId && !$0.isExpired }) {
+            // Check if this pattern already has an active block (uses pattern.id as block identifier)
+            if mutableState.activeBlocks.contains(where: { $0.blocklistId == pattern.id && !$0.isExpired }) {
                 continue  // Already blocked
             }
 
@@ -575,47 +578,71 @@ func applyBlocks(
     hostsManager: HostsManager,
     packetFilterManager: PacketFilterManager
 ) throws {
-    // Collect all domains from active non-expired blocks
-    var allDomains = Set<String>()
-
-    for block in state.activeBlocks where !block.isExpired {
+    // Collect blocked domains (from .block mode active blocks)
+    var blockedDomains = Set<String>()
+    for block in state.activeBlocks where !block.isExpired && block.mode == .block {
         for domain in block.domains {
-            allDomains.insert(domain.lowercased())
+            blockedDomains.insert(domain.lowercased())
         }
     }
 
-    // Check if domains changed (nil = never synced, always sync on first run)
-    if let previous = previousBlockedDomains, allDomains == previous {
+    // Collect allowed domains (from .allow mode active blocks)
+    var allowedDomains = Set<String>()
+    let isAllowListActive = state.hasActiveAllowList
+    for block in state.activeBlocks where !block.isExpired && block.mode == .allow {
+        for domain in block.domains {
+            allowedDomains.insert(domain.lowercased())
+        }
+    }
+
+    // Block wins: remove blocked domains from allowed set
+    allowedDomains.subtract(blockedDomains)
+
+    // Check if anything changed (nil = never synced, always sync on first run)
+    if let prevBlocked = previousBlockedDomains,
+       let prevAllowed = previousAllowedDomains,
+       blockedDomains == prevBlocked && allowedDomains == prevAllowed {
         return  // No change, skip updates
     }
 
-    log.info("Block state changed. Now blocking \(allDomains.count) domain(s)")
+    log.info("Block state changed. Blocking \(blockedDomains.count) domain(s), allowing \(allowedDomains.count) domain(s), allowList=\(isAllowListActive)")
 
-    // LAYER 1: Hosts file blocking
+    // Track success of each layer so we can retry on next iteration if either fails
+    var allLayersSucceeded = true
+
+    // LAYER 1: Hosts file blocking (block-mode domains only — allow list handled by PF)
     do {
-        try hostsManager.applyBlocklistAndFlush(domains: Array(allDomains))
+        try hostsManager.applyBlocklistAndFlush(domains: Array(blockedDomains))
         log.info("Layer 1: Hosts file updated")
     } catch HostsManager.HostsError.permissionDenied {
         log.error("Layer 1: Hosts file - permission denied (not running as root)")
+        allLayersSucceeded = false
     } catch {
         log.error("Layer 1: Hosts file error - \(error)")
+        allLayersSucceeded = false
     }
 
-    // LAYER 2: PF firewall blocking (network-level, bypasses browser DNS cache)
+    // LAYER 2: PF firewall (unified rules for both block and allow modes)
     do {
-        if allDomains.isEmpty {
-            try packetFilterManager.stopBlock()
-            log.info("Layer 2: PF firewall rules cleared")
-        } else {
-            try packetFilterManager.startBlock(domains: Array(allDomains))
-            log.info("Layer 2: PF firewall rules applied")
-        }
+        try packetFilterManager.applyRules(
+            blockedDomains: Array(blockedDomains),
+            allowedDomains: Array(allowedDomains),
+            isAllowListActive: isAllowListActive
+        )
+        log.info("Layer 2: PF firewall rules applied")
     } catch PacketFilterManager.PFError.permissionDenied {
         log.error("Layer 2: PF firewall - permission denied (not running as root)")
+        allLayersSucceeded = false
     } catch {
         log.error("Layer 2: PF firewall error - \(error)")
+        allLayersSucceeded = false
     }
 
-    // Update tracking
-    previousBlockedDomains = allDomains
+    // Only update tracking if both layers succeeded.
+    // If either failed, leave tracking stale so the next iteration
+    // re-enters this function and retries both layers.
+    if allLayersSucceeded {
+        previousBlockedDomains = blockedDomains
+        previousAllowedDomains = allowedDomains
+    }
 }

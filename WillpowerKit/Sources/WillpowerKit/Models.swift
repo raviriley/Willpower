@@ -7,6 +7,14 @@
 
 import Foundation
 
+// MARK: - Blocklist Mode
+
+/// Whether a blocklist operates as a blocklist (block listed domains) or allow list (allow only listed domains)
+public enum BlocklistMode: String, Codable, Sendable, Hashable {
+    case block  // Traditional blocklist: listed domains are blocked
+    case allow  // Allow list: only listed domains are accessible, everything else blocked
+}
+
 // MARK: - Trigger Types
 
 /// Defines how a blocklist can be triggered
@@ -248,8 +256,10 @@ public struct BlocklistConfig: Codable, Sendable, Identifiable, Equatable {
     public var id: UUID
     /// Display name (e.g., "Social Media", "News Sites")
     public var name: String
-    /// Domains to block (e.g., ["twitter.com", "facebook.com"])
+    /// Domains to block or allow (depending on mode)
     public var domains: [String]
+    /// Whether this is a blocklist (.block) or allow list (.allow)
+    public var mode: BlocklistMode
     /// Triggers that can activate this blocklist
     public var triggers: [TriggerConfig]
     /// Whether this blocklist is currently being enforced
@@ -261,6 +271,7 @@ public struct BlocklistConfig: Codable, Sendable, Identifiable, Equatable {
         id: UUID = UUID(),
         name: String,
         domains: [String],
+        mode: BlocklistMode = .block,
         triggers: [TriggerConfig] = [],
         isActive: Bool = false,
         createdAt: Date = Date(),
@@ -269,10 +280,24 @@ public struct BlocklistConfig: Codable, Sendable, Identifiable, Equatable {
         self.id = id
         self.name = name
         self.domains = domains
+        self.mode = mode
         self.triggers = triggers
         self.isActive = isActive
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+    }
+
+    // Custom Decodable for backward compatibility with existing JSON without mode
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        domains = try container.decode([String].self, forKey: .domains)
+        mode = try container.decodeIfPresent(BlocklistMode.self, forKey: .mode) ?? .block
+        triggers = try container.decode([TriggerConfig].self, forKey: .triggers)
+        isActive = try container.decode(Bool.self, forKey: .isActive)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        updatedAt = try container.decode(Date.self, forKey: .updatedAt)
     }
 }
 
@@ -283,8 +308,10 @@ public struct ActiveBlock: Codable, Sendable, Identifiable, Equatable {
     public var id: UUID
     /// Reference to the BlocklistConfig that created this block
     public var blocklistId: UUID
-    /// Domains being blocked (snapshot at activation time)
+    /// Domains being blocked or allowed (snapshot at activation time)
     public var domains: [String]
+    /// Whether this is a block (.block) or allow list (.allow) enforcement
+    public var mode: BlocklistMode
     /// When the block was activated
     public var startedAt: Date
     /// When the block expires (nil = indefinite, e.g., schedule-based)
@@ -305,6 +332,7 @@ public struct ActiveBlock: Codable, Sendable, Identifiable, Equatable {
         id: UUID = UUID(),
         blocklistId: UUID,
         domains: [String],
+        mode: BlocklistMode = .block,
         startedAt: Date = Date(),
         expiresAt: Date?,
         reason: BlockReason,
@@ -313,10 +341,24 @@ public struct ActiveBlock: Codable, Sendable, Identifiable, Equatable {
         self.id = id
         self.blocklistId = blocklistId
         self.domains = domains
+        self.mode = mode
         self.startedAt = startedAt
         self.expiresAt = expiresAt
         self.reason = reason
         self.isLocked = isLocked
+    }
+
+    // Custom Decodable for backward compatibility with existing JSON without mode
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        blocklistId = try container.decode(UUID.self, forKey: .blocklistId)
+        domains = try container.decode([String].self, forKey: .domains)
+        mode = try container.decodeIfPresent(BlocklistMode.self, forKey: .mode) ?? .block
+        startedAt = try container.decode(Date.self, forKey: .startedAt)
+        expiresAt = try container.decodeIfPresent(Date.self, forKey: .expiresAt)
+        reason = try container.decode(BlockReason.self, forKey: .reason)
+        isLocked = try container.decode(Bool.self, forKey: .isLocked)
     }
 
     /// Check if this block has expired
@@ -411,13 +453,27 @@ public struct WillpowerState: Codable, Sendable {
         self.daemonVersion = daemonVersion
     }
 
-    /// Get all domains currently being blocked
+    /// Get all domains currently being blocked (from .block mode active blocks only)
     public var allBlockedDomains: Set<String> {
         var domains = Set<String>()
-        for block in activeBlocks where !block.isExpired {
+        for block in activeBlocks where !block.isExpired && block.mode == .block {
             domains.formUnion(block.domains)
         }
         return domains
+    }
+
+    /// Get all domains currently allowed (from .allow mode active blocks)
+    public var allAllowedDomains: Set<String> {
+        var domains = Set<String>()
+        for block in activeBlocks where !block.isExpired && block.mode == .allow {
+            domains.formUnion(block.domains)
+        }
+        return domains
+    }
+
+    /// Whether any allow list is currently active
+    public var hasActiveAllowList: Bool {
+        activeBlocks.contains { !$0.isExpired && $0.mode == .allow }
     }
 }
 
