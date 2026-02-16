@@ -197,8 +197,10 @@ public struct IndependentTrigger: Codable, Sendable, Identifiable, Hashable, Equ
         isEnabled = try container.decode(Bool.self, forKey: .isEnabled)
         createdAt = try container.decode(Date.self, forKey: .createdAt)
         updatedAt = try container.decode(Date.self, forKey: .updatedAt)
-        dailyResetHour = try container.decodeIfPresent(Int.self, forKey: .dailyResetHour) ?? 6
-        dailyResetMinute = try container.decodeIfPresent(Int.self, forKey: .dailyResetMinute) ?? 0
+        let decodedHour = try container.decodeIfPresent(Int.self, forKey: .dailyResetHour) ?? 6
+        let decodedMinute = try container.decodeIfPresent(Int.self, forKey: .dailyResetMinute) ?? 0
+        dailyResetHour = min(max(decodedHour, 0), 23)
+        dailyResetMinute = min(max(decodedMinute, 0), 59)
     }
 
     public init(
