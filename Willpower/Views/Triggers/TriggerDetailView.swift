@@ -222,7 +222,7 @@ struct TriggerDetailView: View {
                             Picker("When triggered", selection: $newPatternBlockAction) {
                                 Text("Block domain").tag(BlockAction.blockDomain)
                                 ForEach(viewModel.blocklists) { blocklist in
-                                    Text("Activate: \(blocklist.name)").tag(BlockAction.activateBlocklist(blocklistId: blocklist.id))
+                                    Text("Activate \(blocklist.mode == .block ? "blocklist" : "allowlist"): \(blocklist.name)").tag(BlockAction.activateBlocklist(blocklistId: blocklist.id))
                                 }
                             }
                             .pickerStyle(.menu)

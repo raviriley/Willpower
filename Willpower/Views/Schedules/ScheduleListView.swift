@@ -32,7 +32,7 @@ struct ScheduleListView: View {
                 }
             }
         )) {
-            ForEach(viewModel.blocklists) { blocklist in
+            ForEach(viewModel.regularBlocklists) { blocklist in
                 let schedules = viewModel.scheduleTriggers(for: blocklist)
                 if !schedules.isEmpty {
                     Section(blocklist.name) {
@@ -61,7 +61,7 @@ struct ScheduleListView: View {
         .toolbar {
             ToolbarItem {
                 Menu {
-                    ForEach(viewModel.blocklists) { blocklist in
+                    ForEach(viewModel.regularBlocklists) { blocklist in
                         Button(blocklist.name) {
                             createNewSchedule(for: blocklist)
                         }
@@ -69,7 +69,7 @@ struct ScheduleListView: View {
                 } label: {
                     Label("Add Schedule", systemImage: "plus")
                 }
-                .disabled(viewModel.blocklists.isEmpty)
+                .disabled(viewModel.regularBlocklists.isEmpty)
             }
         }
         .overlay {
@@ -79,9 +79,9 @@ struct ScheduleListView: View {
                 } description: {
                     Text("Schedules automatically block websites at specific times. Perfect for work hours, study sessions, or bedtime routines.")
                 } actions: {
-                    if !viewModel.blocklists.isEmpty {
+                    if !viewModel.regularBlocklists.isEmpty {
                         Menu("Add Schedule") {
-                            ForEach(viewModel.blocklists) { blocklist in
+                            ForEach(viewModel.regularBlocklists) { blocklist in
                                 Button(blocklist.name) {
                                     createNewSchedule(for: blocklist)
                                 }

@@ -28,10 +28,18 @@ struct StatusDashboardView: View {
                 )
                 StatCard(
                     title: "Blocklists",
-                    value: "\(viewModel.blocklists.count)",
+                    value: "\(viewModel.regularBlocklists.count)",
                     icon: "list.bullet",
                     color: .accentColor
                 )
+                if viewModel.hasActiveAllowList {
+                    StatCard(
+                        title: "Allow List Active",
+                        value: "\(viewModel.totalDomainsAllowed) allowed",
+                        icon: "checkmark.shield.fill",
+                        color: .green
+                    )
+                }
             }
             .padding()
         }
