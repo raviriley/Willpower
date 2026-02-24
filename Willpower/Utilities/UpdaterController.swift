@@ -6,6 +6,7 @@
 //  Provides SwiftUI integration for update checking.
 //
 
+import AppKit
 import Foundation
 import SwiftUI
 
@@ -22,6 +23,7 @@ final class UpdaterController {
 
     private let updaterController: SPUStandardUpdaterController
     private let delegateHandler = UpdaterDelegateHandler()
+    private var lastGitHubCheck: Date = .distantPast
 
     /// Whether a newer version is available
     var isUpdateAvailable: Bool = false
@@ -67,6 +69,14 @@ final class UpdaterController {
         }
 
         Task { await checkLatestVersion() }
+
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in await self?.checkLatestVersion() }
+        }
     }
 
     // MARK: - Actions
@@ -79,6 +89,8 @@ final class UpdaterController {
 
     /// Lightweight GitHub API check as fallback for Sparkle
     private func checkLatestVersion() async {
+        guard Date().timeIntervalSince(lastGitHubCheck) > 300 else { return }
+        lastGitHubCheck = Date()
         guard let url = URL(string: "https://api.github.com/repos/raviriley/Willpower/releases/latest") else { return }
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
