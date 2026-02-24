@@ -69,6 +69,9 @@ fi
 # Step 2: Generate appcast
 log_step "Generating appcast.xml..."
 
+# Clean old appcast output to prevent stale data from being reused
+rm -rf "$APPCAST_DIR"
+
 # Set download URL prefix for GitHub Releases
 export SPARKLE_DOWNLOAD_URL="https://github.com/$GITHUB_REPO/releases/download/v$VERSION/"
 
@@ -86,12 +89,26 @@ if [ ! -f "$APPCAST_PATH" ]; then
     DMG_SIZE=$(stat -f%z "$DMG_PATH")
     DMG_DATE=$(date -R)
 
+    # Get build number (CFBundleVersion) from project - Sparkle needs this for sparkle:version
+    PBXPROJ="$PROJECT_DIR/Willpower.xcodeproj/project.pbxproj"
+    BUILD_NUMBER=$(grep -m1 'CURRENT_PROJECT_VERSION = ' "$PBXPROJ" | sed 's/.*= \([0-9]*\);/\1/')
+
     # Sign the DMG for Sparkle (get EdDSA signature)
     SPARKLE_SIGN=$(find ~/Library/Developer/Xcode/DerivedData -name "sign_update" -type f 2>/dev/null | head -1)
     SIGNATURE=""
     if [ -n "$SPARKLE_SIGN" ] && [ -x "$SPARKLE_SIGN" ]; then
         SIGNATURE=$("$SPARKLE_SIGN" "$DMG_PATH" 2>/dev/null | grep "sparkle:edSignature" | sed 's/.*sparkle:edSignature="\([^"]*\)".*/\1/')
     fi
+
+    if [ -z "$SIGNATURE" ]; then
+        log_error "Failed to sign DMG with EdDSA key - appcast will be missing signature"
+        log_error "Sparkle updates will NOT work without a valid signature"
+        exit 1
+    fi
+
+    log_info "sparkle:version (build number): $BUILD_NUMBER"
+    log_info "sparkle:shortVersionString: $VERSION"
+    log_info "EdDSA signature: ${SIGNATURE:0:20}..."
 
     cat > "$APPCAST_PATH" << EOF
 <?xml version="1.0" encoding="utf-8"?>
@@ -103,7 +120,7 @@ if [ ! -f "$APPCAST_PATH" ]; then
     <item>
       <title>Version $VERSION</title>
       <pubDate>$DMG_DATE</pubDate>
-      <sparkle:version>$VERSION</sparkle:version>
+      <sparkle:version>$BUILD_NUMBER</sparkle:version>
       <sparkle:shortVersionString>$VERSION</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
       <description><![CDATA[
@@ -122,6 +139,15 @@ if [ ! -f "$APPCAST_PATH" ]; then
 EOF
     log_info "Created basic appcast.xml"
 fi
+
+# Validate appcast references the correct version
+if ! grep -q "shortVersionString>$VERSION<" "$APPCAST_PATH"; then
+    log_error "Appcast validation failed: does not reference version $VERSION"
+    log_error "Contents:"
+    cat "$APPCAST_PATH"
+    exit 1
+fi
+log_info "Appcast validated: contains version $VERSION"
 
 # Step 3: Create GitHub Release
 log_step "Creating GitHub Release v$VERSION..."
