@@ -10,6 +10,7 @@ import SwiftUI
 struct SidebarView: View {
     @Binding var selectedCategory: SidebarCategory
     var isDaemonRunning: Bool = false
+    var isUpdateAvailable: Bool = false
 
     var body: some View {
         List(SidebarCategory.allCases, selection: $selectedCategory) { category in
@@ -20,7 +21,7 @@ struct SidebarView: View {
         .safeAreaInset(edge: .bottom) {
             VStack(spacing: 0) {
                 Divider()
-                DaemonStatusIndicator(isRunning: isDaemonRunning)
+                DaemonStatusIndicator(isRunning: isDaemonRunning, isUpdateAvailable: isUpdateAvailable)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 8)

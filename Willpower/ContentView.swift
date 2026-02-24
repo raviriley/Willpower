@@ -11,10 +11,11 @@ import WillpowerKit
 struct ContentView: View {
     @Bindable var viewModel: WillpowerViewModel
     @Environment(DaemonManager.self) private var daemonManager
+    @Environment(UpdaterController.self) private var updaterController
 
     var body: some View {
         NavigationSplitView {
-            SidebarView(selectedCategory: $viewModel.selectedCategory, isDaemonRunning: viewModel.isDaemonRunning)
+            SidebarView(selectedCategory: $viewModel.selectedCategory, isDaemonRunning: viewModel.isDaemonRunning, isUpdateAvailable: updaterController.isUpdateAvailable)
         } content: {
             ContentListView(viewModel: viewModel, daemonManager: daemonManager)
         } detail: {
@@ -112,4 +113,5 @@ struct DetailView: View {
 #Preview {
     ContentView(viewModel: WillpowerViewModel())
         .environment(DaemonManager())
+        .environment(UpdaterController())
 }

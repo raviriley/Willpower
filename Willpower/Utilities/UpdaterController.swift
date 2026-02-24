@@ -21,6 +21,10 @@ final class UpdaterController {
     // MARK: - Properties
 
     private let updaterController: SPUStandardUpdaterController
+    private let delegateHandler = UpdaterDelegateHandler()
+
+    /// Whether a newer version is available
+    var isUpdateAvailable: Bool = false
 
     /// Whether the updater can check for updates
     var canCheckForUpdates: Bool {
@@ -51,9 +55,18 @@ final class UpdaterController {
         // This handles all the UI for update prompts
         updaterController = SPUStandardUpdaterController(
             startingUpdater: true,
-            updaterDelegate: nil,
+            updaterDelegate: delegateHandler,
             userDriverDelegate: nil
         )
+
+        delegateHandler.onUpdateFound = { [weak self] in
+            Task { @MainActor in self?.isUpdateAvailable = true }
+        }
+        delegateHandler.onNoUpdateFound = { [weak self] in
+            Task { @MainActor in self?.isUpdateAvailable = false }
+        }
+
+        Task { await checkLatestVersion() }
     }
 
     // MARK: - Actions
@@ -62,6 +75,38 @@ final class UpdaterController {
     /// Shows the update UI if an update is available
     func checkForUpdates() {
         updaterController.checkForUpdates(nil)
+    }
+
+    /// Lightweight GitHub API check as fallback for Sparkle
+    private func checkLatestVersion() async {
+        guard let url = URL(string: "https://api.github.com/repos/raviriley/Willpower/releases/latest") else { return }
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let tagName = json["tag_name"] as? String else { return }
+            let remoteVersion = tagName.hasPrefix("v") ? String(tagName.dropFirst()) : tagName
+            let localVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0"
+            if remoteVersion.compare(localVersion, options: .numeric) == .orderedDescending {
+                isUpdateAvailable = true
+            }
+        } catch {
+            // Silently ignore — Sparkle is the primary mechanism
+        }
+    }
+}
+
+// MARK: - Sparkle Delegate
+
+private class UpdaterDelegateHandler: NSObject, SPUUpdaterDelegate {
+    var onUpdateFound: (() -> Void)?
+    var onNoUpdateFound: (() -> Void)?
+
+    func updater(_ updater: SPUUpdater, didFindValidUpdate item: SUAppcastItem) {
+        onUpdateFound?()
+    }
+
+    func updaterDidNotFindUpdate(_ updater: SPUUpdater, error: any Error) {
+        onNoUpdateFound?()
     }
 }
 
@@ -113,6 +158,7 @@ struct UpdateSettingsView: View {
 @MainActor
 @Observable
 final class UpdaterController {
+    var isUpdateAvailable: Bool = false
     var canCheckForUpdates: Bool { false }
     var automaticallyChecksForUpdates: Bool {
         get { false }

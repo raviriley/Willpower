@@ -9,27 +9,44 @@ import SwiftUI
 
 struct DaemonStatusIndicator: View {
     let isRunning: Bool
+    var isUpdateAvailable: Bool = false
+
+    private var color: Color {
+        if !isRunning { return .red }
+        if isUpdateAvailable { return .yellow }
+        return .green
+    }
+
+    private var label: String {
+        if !isRunning { return "Offline" }
+        if isUpdateAvailable { return "Update Available" }
+        return "Running"
+    }
+
+    private var tooltip: String {
+        if !isRunning { return "Daemon is not running - blocks may not be enforced" }
+        if isUpdateAvailable { return "A newer version of Willpower is available — please update" }
+        return "Willpower daemon is active and monitoring"
+    }
 
     var body: some View {
         HStack(spacing: 6) {
             Circle()
-                .fill(isRunning ? .green : .red)
+                .fill(color)
                 .frame(width: 8, height: 8)
 
-            Text(isRunning ? "Running" : "Offline")
+            Text(label)
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
-        .help(isRunning
-            ? "Willpower daemon is active and monitoring"
-            : "Daemon is not running - blocks may not be enforced"
-        )
+        .help(tooltip)
     }
 }
 
 #Preview {
     VStack(spacing: 20) {
         DaemonStatusIndicator(isRunning: true)
+        DaemonStatusIndicator(isRunning: true, isUpdateAvailable: true)
         DaemonStatusIndicator(isRunning: false)
     }
     .padding()
