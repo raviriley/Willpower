@@ -14,7 +14,7 @@ struct ContentView: View {
 
     var body: some View {
         NavigationSplitView {
-            SidebarView(selectedCategory: $viewModel.selectedCategory)
+            SidebarView(selectedCategory: $viewModel.selectedCategory, isDaemonRunning: viewModel.isDaemonRunning)
         } content: {
             ContentListView(viewModel: viewModel, daemonManager: daemonManager)
         } detail: {
@@ -22,11 +22,6 @@ struct ContentView: View {
         }
         .navigationSplitViewStyle(.balanced)
         .frame(minWidth: 900, minHeight: 600)
-        .toolbar {
-            ToolbarItem(placement: .navigation) {
-                DaemonStatusIndicator(isRunning: viewModel.isDaemonRunning)
-            }
-        }
         .alert("Error", isPresented: .init(
             get: { viewModel.errorMessage != nil },
             set: { if !$0 { viewModel.clearError() } }

@@ -9,6 +9,7 @@ import SwiftUI
 
 struct SidebarView: View {
     @Binding var selectedCategory: SidebarCategory
+    var isDaemonRunning: Bool = false
 
     var body: some View {
         List(SidebarCategory.allCases, selection: $selectedCategory) { category in
@@ -16,10 +17,19 @@ struct SidebarView: View {
                 .tag(category)
         }
         .listStyle(.sidebar)
+        .safeAreaInset(edge: .bottom) {
+            VStack(spacing: 0) {
+                Divider()
+                DaemonStatusIndicator(isRunning: isDaemonRunning)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+            }
+        }
         .navigationSplitViewColumnWidth(min: 180, ideal: 200, max: 250)
     }
 }
 
 #Preview {
-    SidebarView(selectedCategory: .constant(.status))
+    SidebarView(selectedCategory: .constant(.status), isDaemonRunning: true)
 }
