@@ -2,6 +2,11 @@
 
 ## Releases
 
+### 1.0.9
+- Show update-available indicator in sidebar (yellow "Update Available" state)
+- Check GitHub releases as fallback for Sparkle update detection
+- Re-check for updates each time app comes to foreground (throttled to every 5 minutes)
+
 ### 1.0.8
 - Sync daemon version with app version (was stuck at 1.0.6)
 - Release script now updates daemon version automatically
