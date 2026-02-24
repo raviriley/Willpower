@@ -52,7 +52,7 @@ log_step "Building release..."
 
 # Commit version changes made by release.sh
 log_step "Committing version changes..."
-git add "$PROJECT_DIR/Willpower.xcodeproj/project.pbxproj"
+git add "$PROJECT_DIR/Willpower.xcodeproj/project.pbxproj" "$PROJECT_DIR/WillpowerDaemon/main.swift"
 git commit -m "Bump version to $VERSION"
 git push origin main
 

@@ -105,6 +105,11 @@ sed -i '' "s/CURRENT_PROJECT_VERSION = [^;]*;/CURRENT_PROJECT_VERSION = $NEW_BUI
 log_info "MARKETING_VERSION = $VERSION"
 log_info "CURRENT_PROJECT_VERSION = $NEW_BUILD (was $CURRENT_BUILD)"
 
+# Update daemon version string in main.swift
+DAEMON_MAIN="$PROJECT_DIR/WillpowerDaemon/main.swift"
+sed -i '' "s/private let daemonVersion = \"[^\"]*\"/private let daemonVersion = \"$VERSION\"/" "$DAEMON_MAIN"
+log_info "Daemon version = $VERSION"
+
 log_header "Step 1/4: Building Release"
 
 log_step "Cleaning previous builds..."

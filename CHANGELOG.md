@@ -2,9 +2,14 @@
 
 ## Releases
 
+### 1.0.8
+- Sync daemon version with app version (was stuck at 1.0.6)
+- Release script now updates daemon version automatically
+
 ### 1.0.7
 - Move daemon status indicator to sidebar footer
 - Improve liquid glass toolbar appearance
+- Fix appcast generation using stale data from previous releases
 - Fix bugs
 
 ### 1.0.6
