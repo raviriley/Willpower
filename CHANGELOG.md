@@ -5,7 +5,6 @@
 ### 1.0.7
 - Move daemon status indicator to sidebar footer
 - Improve liquid glass toolbar appearance
-- Fix appcast generation using stale data from previous releases
 - Fix bugs
 
 ### 1.0.6
