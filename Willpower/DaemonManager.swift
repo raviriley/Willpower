@@ -29,6 +29,9 @@ final class DaemonManager {
     /// Last error message if registration failed
     private(set) var lastError: String?
 
+    /// True while a reinstall operation is in progress
+    private(set) var isReinstalling: Bool = false
+
     // MARK: - Computed Properties
 
     /// True if daemon is registered but user hasn't enabled it in System Settings
@@ -152,29 +155,47 @@ final class DaemonManager {
 
     /// Unregister and re-register the daemon to pick up a new binary
     func update() {
+        reinstall()
+    }
+
+    /// Unregister and re-register the daemon. Handles the case where the daemon
+    /// is already registered but not running (the common "stuck" state).
+    func reinstall() {
         lastError = nil
-        logger.info("Updating daemon (unregister + re-register)...")
+        isReinstalling = true
+        logger.info("Reinstalling daemon (unregister + re-register)...")
 
         let service = SMAppService.daemon(plistName: Self.plistName)
 
-        // Unregister first
+        // Step 1: Unregister first (best-effort — may not be registered)
         do {
             try service.unregister()
-            logger.info("Daemon unregistered for update")
+            logger.info("Daemon unregistered for reinstall")
         } catch {
-            logger.warning("Unregister during update failed (may not be registered): \(error.localizedDescription)")
+            logger.warning("Unregister failed (may not be registered): \(error.localizedDescription)")
         }
 
-        // Small delay to let launchd clean up
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [self] in
-            do {
-                try service.register()
-                logger.info("Daemon re-registered successfully")
-                refreshStatus()
-            } catch {
-                logger.error("Daemon re-registration failed: \(error.localizedDescription)")
-                lastError = error.localizedDescription
-                refreshStatus()
+        // Step 2: Register
+        do {
+            try service.register()
+            logger.info("Daemon re-registered successfully")
+            isReinstalling = false
+            refreshStatus()
+        } catch {
+            logger.warning("First register attempt failed: \(error.localizedDescription), retrying...")
+            // Retry once after a brief delay to let launchd finish cleanup
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(500))
+                do {
+                    try service.register()
+                    logger.info("Daemon re-registered on retry")
+                    self.lastError = nil
+                } catch {
+                    logger.error("Daemon re-registration failed: \(error.localizedDescription)")
+                    self.lastError = error.localizedDescription
+                }
+                self.isReinstalling = false
+                self.refreshStatus()
             }
         }
     }

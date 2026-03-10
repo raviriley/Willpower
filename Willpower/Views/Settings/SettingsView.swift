@@ -46,11 +46,19 @@ struct SettingsView: View {
                             .font(.callout)
                             .foregroundStyle(.secondary)
                         Spacer()
-                        Button("Reinstall") {
-                            daemonManager.register()
+                        Button {
+                            daemonManager.reinstall()
+                        } label: {
+                            if daemonManager.isReinstalling {
+                                ProgressView()
+                                    .controlSize(.small)
+                            } else {
+                                Text("Reinstall")
+                            }
                         }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
+                        .disabled(daemonManager.isReinstalling)
                     }
                 } else if let daemonVer = viewModel.daemonVersion, daemonVer != appVersionShort {
                     HStack {
@@ -58,12 +66,24 @@ struct SettingsView: View {
                             .font(.callout)
                             .foregroundStyle(.orange)
                         Spacer()
-                        Button("Update Daemon") {
+                        Button {
                             daemonManager.update()
+                        } label: {
+                            if daemonManager.isReinstalling {
+                                ProgressView()
+                                    .controlSize(.small)
+                            } else {
+                                Text("Update Daemon")
+                            }
                         }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
+                        .disabled(daemonManager.isReinstalling)
                     }
+                }
+
+                if let error = daemonManager.lastError {
+                    DaemonErrorMessageView(error: error)
                 }
 
                 if let lastHeartbeat = viewModel.lastDaemonHeartbeat {
