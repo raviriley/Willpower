@@ -3,7 +3,7 @@ import WillpowerKit
 
 // MARK: - Configuration
 
-private let daemonVersion = "1.0.10"
+private let daemonVersion = "1.0.11"
 private let runLoopInterval: TimeInterval = 5.0
 private let heartbeatInterval: TimeInterval = 5.0
 
