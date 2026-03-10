@@ -2,6 +2,11 @@
 
 ## Releases
 
+### 1.0.11
+- Make "Update Available" sidebar indicator clickable to trigger Sparkle update
+- Add "Check for Updates" button to Settings
+- Replace About menu item with navigation to Settings page
+
 ### 1.0.10
 - Fix daemon reinstall UX with retry logic and progress feedback
 - Add bug report form and link in app settings
