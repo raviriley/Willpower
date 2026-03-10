@@ -6,7 +6,7 @@ You can also set up scheduled blocking sessions, create blocklists and allowlist
 
 Willpower is free and open source. Inspired by [SelfControl](https://github.com/SelfControlApp/selfcontrol).
 
-It's a bit buggy on newer macOS versions - your feedback and bug reports are welcome!
+It's a bit buggy on newer macOS versions - your feedback and [bug reports](https://willpowerapp.com/bug-report) are welcome!
 
 ## Installation
 

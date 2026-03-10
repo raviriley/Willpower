@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-1F07HE7S5R"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-1F07HE7S5R');
+    </script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Report a Bug - Willpower</title>
+    <meta name="description" content="Report a bug in the Willpower macOS website blocker app.">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://willpowerapp.com/bug-report">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <link rel="apple-touch-icon" href="favicon.png">
+
+    <meta name="theme-color" content="#6345C6" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#8b7bd4" media="(prefers-color-scheme: dark)">
+
+    <style>
+        :root {
+            --bg: #ffffff;
+            --text: #1d1d1f;
+            --text-secondary: #6e6e73;
+            --accent: #6345C6;
+            --accent-hover: #7558d1;
+            --card-bg: #f5f5f7;
+            --border: #d2d2d7;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #000000;
+                --text: #f5f5f7;
+                --text-secondary: #a1a1a6;
+                --accent: #6345C6;
+                --accent-hover: #7558d1;
+                --card-bg: #1d1d1f;
+                --border: #424245;
+            }
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .container {
+            max-width: 680px;
+            margin: 0 auto;
+            padding: 0 22px;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            padding: 60px 0 40px;
+        }
+
+        .header a {
+            color: var(--accent);
+            text-decoration: none;
+            font-size: 14px;
+        }
+
+        .header a:hover {
+            text-decoration: underline;
+        }
+
+        .header h1 {
+            font-size: 40px;
+            font-weight: 600;
+            letter-spacing: -0.015em;
+            margin-top: 16px;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            font-size: 17px;
+            color: var(--text-secondary);
+        }
+
+        /* Form */
+        .form-card {
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 32px;
+            margin-bottom: 40px;
+        }
+
+        .form-group {
+            margin-bottom: 24px;
+        }
+
+        .form-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+
+        .form-group .hint {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+        }
+
+        .form-group .optional {
+            font-weight: 400;
+            color: var(--text-secondary);
+        }
+
+        .form-group input[type="text"],
+        .form-group input[type="email"],
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 10px 14px;
+            font-size: 15px;
+            font-family: inherit;
+            background: var(--bg);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus,
+        .form-group select:focus {
+            border-color: var(--accent);
+        }
+
+        .form-group textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        .form-group select {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%236e6e73' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            padding-right: 32px;
+        }
+
+        .submit-btn {
+            display: inline-block;
+            background: var(--accent);
+            color: #fff;
+            padding: 12px 28px;
+            border: none;
+            border-radius: 980px;
+            font-size: 17px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+            width: 100%;
+        }
+
+        .submit-btn:hover {
+            background: var(--accent-hover);
+        }
+
+        .submit-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Success message */
+        .success-message {
+            display: none;
+            text-align: center;
+            padding: 60px 32px;
+        }
+
+        .success-message .checkmark {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+
+        .success-message h2 {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .success-message p {
+            font-size: 17px;
+            color: var(--text-secondary);
+            margin-bottom: 24px;
+        }
+
+        .success-message a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        .success-message a:hover {
+            text-decoration: underline;
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 40px 0;
+            border-top: 1px solid var(--border);
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        footer a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        footer .links {
+            margin-bottom: 12px;
+        }
+
+        footer .links a {
+            margin: 0 12px;
+        }
+
+        @media (max-width: 480px) {
+            .header h1 {
+                font-size: 28px;
+            }
+
+            .form-card {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main>
+        <section class="header">
+            <div class="container">
+                <a href="/">&larr; Back to Willpower</a>
+                <h1>Report a Bug</h1>
+                <p>Help us improve Willpower by reporting issues you encounter.</p>
+            </div>
+        </section>
+
+        <section>
+            <div class="container">
+                <div class="form-card" id="formCard">
+                    <form id="bugReportForm" onsubmit="submitForm(event)">
+                        <div class="form-group">
+                            <label for="email">Email <span class="optional">(optional)</span></label>
+                            <p class="hint">In case we need to follow up with you.</p>
+                            <input type="email" id="email" name="email" placeholder="you@example.com">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="summary">Bug Summary</label>
+                            <input type="text" id="summary" name="summary" placeholder="Brief description of the issue" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="steps">Steps to Reproduce</label>
+                            <p class="hint">What were you doing when the bug occurred?</p>
+                            <textarea id="steps" name="steps" placeholder="1. Open the app&#10;2. Go to...&#10;3. Click on..." required></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="expected">Expected vs Actual Behavior</label>
+                            <p class="hint">What did you expect to happen, and what actually happened?</p>
+                            <textarea id="expected" name="expected" placeholder="Expected: Sites should be blocked&#10;Actual: Sites are still accessible" required></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="macosVersion">macOS Version</label>
+                            <select id="macosVersion" name="macosVersion" required>
+                                <option value="" disabled selected>Select your macOS version</option>
+                                <option value="macOS 15 (Sequoia)">macOS 15 (Sequoia)</option>
+                                <option value="macOS 14 (Sonoma)">macOS 14 (Sonoma)</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="appVersion">App Version <span class="optional">(optional)</span></label>
+                            <p class="hint">Found in Settings &gt; About in the app.</p>
+                            <input type="text" id="appVersion" name="appVersion" placeholder="e.g. 1.0.9">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="additional">Additional Context <span class="optional">(optional)</span></label>
+                            <p class="hint">Any other details, error messages, or screenshots you can describe.</p>
+                            <textarea id="additional" name="additional" placeholder="Any additional information..."></textarea>
+                        </div>
+
+                        <button type="submit" class="submit-btn" id="submitBtn">Submit Bug Report</button>
+                    </form>
+                </div>
+
+                <div class="form-card success-message" id="successMessage">
+                    <div class="checkmark">&#10003;</div>
+                    <h2>Thank you!</h2>
+                    <p>Your bug report has been submitted. We appreciate you helping improve Willpower.</p>
+                    <a href="/">Back to Willpower</a>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container">
+            <div class="links">
+                <a href="https://github.com/raviriley/Willpower">GitHub</a>
+                <a href="/bug-report">Report a Bug</a>
+                <a href="https://x.com/ravi_riley">@ravi_riley</a>
+            </div>
+            <p>Free and open source under the GNU GPL v3 License</p>
+        </div>
+    </footer>
+
+    <script>
+        // =============================================================
+        // IMPORTANT: Replace these placeholder values with your actual
+        // Google Form action URL and entry IDs. See the setup
+        // instructions provided in the pull request description.
+        // =============================================================
+        const GOOGLE_FORM_ACTION_URL = 'https://docs.google.com/forms/d/e/YOUR_FORM_ID/formResponse';
+        const FIELD_MAP = {
+            email:        'entry.REPLACE_EMAIL',
+            summary:      'entry.REPLACE_SUMMARY',
+            steps:        'entry.REPLACE_STEPS',
+            expected:     'entry.REPLACE_EXPECTED',
+            macosVersion: 'entry.REPLACE_MACOS',
+            appVersion:   'entry.REPLACE_APPVERSION',
+            additional:   'entry.REPLACE_ADDITIONAL'
+        };
+
+        function submitForm(e) {
+            e.preventDefault();
+
+            const btn = document.getElementById('submitBtn');
+            btn.disabled = true;
+            btn.textContent = 'Submitting...';
+
+            const formData = new URLSearchParams();
+            for (const [field, entryId] of Object.entries(FIELD_MAP)) {
+                const el = document.getElementById(field);
+                if (el && el.value) {
+                    formData.append(entryId, el.value);
+                }
+            }
+
+            fetch(GOOGLE_FORM_ACTION_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: formData.toString()
+            }).then(() => {
+                document.getElementById('formCard').querySelector('form').style.display = 'none';
+                document.getElementById('formCard').style.display = 'none';
+                document.getElementById('successMessage').style.display = 'block';
+
+                gtag('event', 'bug_report_submitted', {
+                    'event_category': 'engagement',
+                    'event_label': 'Bug Report'
+                });
+            }).catch(() => {
+                btn.disabled = false;
+                btn.textContent = 'Submit Bug Report';
+                alert('Something went wrong. Please try again or report the issue on GitHub.');
+            });
+        }
+    </script>
+</body>
+</html>

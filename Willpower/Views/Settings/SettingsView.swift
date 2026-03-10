@@ -181,6 +181,17 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
 
+                Link(destination: URL(string: "https://willpowerapp.com/bug-report")!) {
+                    HStack {
+                        Label("Report a Bug", systemImage: "ladybug")
+                        Spacer()
+                        Image(systemName: "arrow.up.right")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .buttonStyle(.borderless)
+
                 Link(destination: URL(string: "https://github.com/raviriley/Willpower")!) {
                     Label("View on GitHub", systemImage: "link")
                 }
