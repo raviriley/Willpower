@@ -67,8 +67,13 @@ struct WillpowerApp: App {
         .windowStyle(.automatic)
         .defaultSize(width: 1000, height: 700)
         .commands {
-            // Add "Check for Updates" to the app menu
-            CommandGroup(after: .appInfo) {
+            // Replace default About with navigation to Settings
+            CommandGroup(replacing: .appInfo) {
+                Button("About Willpower") {
+                    appDelegate.showMainWindow()
+                    viewModel.selectedCategory = .settings
+                }
+
                 CheckForUpdatesView()
                     .environment(updaterController)
             }
