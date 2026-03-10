@@ -15,7 +15,7 @@ struct ContentView: View {
 
     var body: some View {
         NavigationSplitView {
-            SidebarView(selectedCategory: $viewModel.selectedCategory, isDaemonRunning: viewModel.isDaemonRunning, isUpdateAvailable: updaterController.isUpdateAvailable)
+            SidebarView(selectedCategory: $viewModel.selectedCategory, isDaemonRunning: viewModel.isDaemonRunning, isUpdateAvailable: updaterController.isUpdateAvailable, onUpdateTap: { updaterController.checkForUpdates() })
         } content: {
             ContentListView(viewModel: viewModel, daemonManager: daemonManager)
         } detail: {

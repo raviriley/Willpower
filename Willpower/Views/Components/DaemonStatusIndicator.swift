@@ -10,6 +10,7 @@ import SwiftUI
 struct DaemonStatusIndicator: View {
     let isRunning: Bool
     var isUpdateAvailable: Bool = false
+    var onUpdateTap: (() -> Void)? = nil
 
     private var color: Color {
         if !isRunning { return .red }
@@ -25,11 +26,22 @@ struct DaemonStatusIndicator: View {
 
     private var tooltip: String {
         if !isRunning { return "Daemon is not running - blocks may not be enforced" }
-        if isUpdateAvailable { return "A newer version of Willpower is available — please update" }
+        if isUpdateAvailable { return "A newer version of Willpower is available — click to update" }
         return "Willpower daemon is active and monitoring"
     }
 
     var body: some View {
+        if isUpdateAvailable, let onUpdateTap {
+            Button(action: onUpdateTap) {
+                indicator
+            }
+            .buttonStyle(.plain)
+        } else {
+            indicator
+        }
+    }
+
+    private var indicator: some View {
         HStack(spacing: 6) {
             Circle()
                 .fill(color)

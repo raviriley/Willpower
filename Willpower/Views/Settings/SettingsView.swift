@@ -17,6 +17,7 @@ private let logger = WillpowerLogger.settings
 struct SettingsView: View {
     @Bindable var viewModel: WillpowerViewModel
     @Bindable var daemonManager: DaemonManager
+    @Environment(UpdaterController.self) private var updaterController
 
     @State private var isShowingResetConfirmation = false
     @State private var isShowingExportSheet = false
@@ -170,6 +171,13 @@ struct SettingsView: View {
                     Text(appVersion)
                         .foregroundStyle(.secondary)
                 }
+
+                Button {
+                    updaterController.checkForUpdates()
+                } label: {
+                    Label("Check for Updates", systemImage: "arrow.triangle.2.circlepath")
+                }
+                .buttonStyle(.borderless)
 
                 if let daemonVersion = viewModel.daemonVersion {
                     HStack {
@@ -379,4 +387,5 @@ private struct ExportData: Codable {
 
 #Preview {
     SettingsView(viewModel: WillpowerViewModel(), daemonManager: DaemonManager())
+        .environment(UpdaterController())
 }
