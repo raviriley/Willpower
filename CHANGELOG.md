@@ -2,6 +2,10 @@
 
 ## Releases
 
+### 1.0.10
+- Fix daemon reinstall UX with retry logic and progress feedback
+- Add bug report form and link in app settings
+
 ### 1.0.9
 - Show update-available indicator in sidebar (yellow "Update Available" state)
 - Check GitHub releases as fallback for Sparkle update detection
