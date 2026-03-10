@@ -161,6 +161,7 @@ final class DaemonManager {
     /// Unregister and re-register the daemon. Handles the case where the daemon
     /// is already registered but not running (the common "stuck" state).
     func reinstall() {
+        guard !isReinstalling else { return }
         lastError = nil
         isReinstalling = true
         logger.info("Reinstalling daemon (unregister + re-register)...")
