@@ -94,12 +94,108 @@
             color: var(--text-secondary);
         }
 
+        /* GitHub CTA */
+        .github-cta {
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 40px 32px;
+            margin-bottom: 24px;
+            text-align: center;
+        }
+
+        .github-cta h2 {
+            font-size: 22px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .github-cta p {
+            font-size: 15px;
+            color: var(--text-secondary);
+            margin-bottom: 24px;
+        }
+
+        .github-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            background: #24292f;
+            color: #fff;
+            padding: 14px 32px;
+            border: none;
+            border-radius: 980px;
+            font-size: 17px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+            text-decoration: none;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .github-btn {
+                background: #f5f5f7;
+                color: #1d1d1f;
+            }
+
+            .github-btn:hover {
+                background: #e0e0e2;
+            }
+
+            .github-btn svg {
+                fill: #1d1d1f;
+            }
+        }
+
+        .github-btn:hover {
+            background: #32383f;
+        }
+
+        .github-btn svg {
+            width: 20px;
+            height: 20px;
+            fill: #fff;
+        }
+
+        /* Fallback toggle */
+        .fallback-toggle {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+
+        .fallback-toggle button {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 15px;
+            cursor: pointer;
+            padding: 8px 16px;
+            font-family: inherit;
+            transition: color 0.2s;
+        }
+
+        .fallback-toggle button:hover {
+            color: var(--accent);
+        }
+
         /* Form */
         .form-card {
             background: var(--card-bg);
             border-radius: 16px;
             padding: 32px;
             margin-bottom: 40px;
+            display: none;
+        }
+
+        .form-card.visible {
+            display: block;
+        }
+
+        .form-card .form-note {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: 24px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border);
         }
 
         .form-group {
@@ -250,6 +346,10 @@
                 font-size: 28px;
             }
 
+            .github-cta {
+                padding: 28px 20px;
+            }
+
             .form-card {
                 padding: 20px;
             }
@@ -268,7 +368,24 @@
 
         <section>
             <div class="container">
+                <!-- GitHub CTA (default/primary path) -->
+                <div class="github-cta" id="githubCta">
+                    <h2>Report on GitHub</h2>
+                    <p>The fastest way to report a bug. Your issue will be tracked and you'll get updates on the fix.</p>
+                    <a href="https://github.com/raviriley/Willpower/issues/new?template=bug_report.yml" class="github-btn">
+                        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+                        Report on GitHub
+                    </a>
+                </div>
+
+                <!-- Fallback toggle -->
+                <div class="fallback-toggle" id="fallbackToggle">
+                    <button onclick="showFallbackForm()">Don't have a GitHub account? Report here instead</button>
+                </div>
+
+                <!-- Fallback form (hidden by default) -->
                 <div class="form-card" id="formCard">
+                    <p class="form-note">This form is for users without a GitHub account. If you have one, please <a href="https://github.com/raviriley/Willpower/issues/new?template=bug_report.yml">report on GitHub</a> instead for faster tracking.</p>
                     <form id="bugReportForm" onsubmit="submitForm(event)">
                         <div class="form-group">
                             <label for="summary">Bug Summary</label>
@@ -282,8 +399,13 @@
                         </div>
 
                         <div class="form-group">
-                            <label for="expected">Expected vs Actual Behavior</label>
-                            <textarea id="expected" name="expected" placeholder="Expected: Sites should be blocked&#10;Actual: Sites are still accessible" required></textarea>
+                            <label for="expected">Expected Behavior</label>
+                            <textarea id="expected" name="expected" placeholder="What did you expect to happen?" required></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="actual">Actual Behavior</label>
+                            <textarea id="actual" name="actual" placeholder="What actually happened?" required></textarea>
                         </div>
 
                         <div class="form-group">
@@ -318,7 +440,7 @@
                     </form>
                 </div>
 
-                <div class="form-card success-message" id="successMessage">
+                <div class="form-card success-message visible" id="successMessage" style="display: none;">
                     <div class="checkmark">&#10003;</div>
                     <h2>Thank you!</h2>
                     <p>Your bug report has been submitted. We appreciate you helping improve Willpower.</p>
@@ -340,11 +462,6 @@
     </footer>
 
     <script>
-        // =============================================================
-        // IMPORTANT: Replace these placeholder values with your actual
-        // Google Form action URL and entry IDs. See the setup
-        // instructions provided in the pull request description.
-        // =============================================================
         const GOOGLE_FORM_ACTION_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSc6JBr5lNZfrBhv3yQC3g41IYE8pB__LNq6WpK6xW3yCg2RvA/formResponse';
         const FIELD_MAP = {
             summary:      'entry.1530248552',
@@ -356,6 +473,16 @@
             macosVersion: 'entry.1781099815',
         };
 
+        function showFallbackForm() {
+            document.getElementById('formCard').classList.add('visible');
+            document.getElementById('fallbackToggle').style.display = 'none';
+
+            gtag('event', 'fallback_form_shown', {
+                'event_category': 'engagement',
+                'event_label': 'No GitHub Account'
+            });
+        }
+
         function submitForm(e) {
             e.preventDefault();
 
@@ -363,13 +490,25 @@
             btn.disabled = true;
             btn.textContent = 'Submitting...';
 
+            // Concatenate expected + actual into the single Google Form field
+            const expectedVal = document.getElementById('expected').value;
+            const actualVal = document.getElementById('actual').value;
+            const combinedExpectedActual = 'Expected: ' + expectedVal + '\nActual: ' + actualVal;
+
             const formData = new URLSearchParams();
-            for (const [field, entryId] of Object.entries(FIELD_MAP)) {
-                const el = document.getElementById(field);
-                if (el && el.value) {
-                    formData.append(entryId, el.value);
-                }
-            }
+            formData.append(FIELD_MAP.summary, document.getElementById('summary').value);
+            formData.append(FIELD_MAP.steps, document.getElementById('steps').value);
+            formData.append(FIELD_MAP.expected, combinedExpectedActual);
+            formData.append(FIELD_MAP.appVersion, document.getElementById('appVersion').value);
+
+            const email = document.getElementById('email').value;
+            if (email) formData.append(FIELD_MAP.email, email);
+
+            const macosVersion = document.getElementById('macosVersion').value;
+            if (macosVersion) formData.append(FIELD_MAP.macosVersion, macosVersion);
+
+            const additional = document.getElementById('additional').value;
+            if (additional) formData.append(FIELD_MAP.additional, additional);
 
             fetch(GOOGLE_FORM_ACTION_URL, {
                 method: 'POST',
@@ -377,13 +516,13 @@
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: formData.toString()
             }).then(() => {
-                document.getElementById('formCard').querySelector('form').style.display = 'none';
                 document.getElementById('formCard').style.display = 'none';
+                document.getElementById('githubCta').style.display = 'none';
                 document.getElementById('successMessage').style.display = 'block';
 
                 gtag('event', 'bug_report_submitted', {
                     'event_category': 'engagement',
-                    'event_label': 'Bug Report'
+                    'event_label': 'Bug Report (Web Form)'
                 });
             }).catch(() => {
                 btn.disabled = false;
