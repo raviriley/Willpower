@@ -60,6 +60,9 @@ final class WillpowerViewModel {
     /// Global daily visit counter reset time (minute 0-59)
     var dailyResetMinute: Int = 0
 
+    /// Whether to display times in 24-hour format (false = 12-hour AM/PM)
+    var use24HourTime: Bool = false
+
     /// Daemon status
     var isDaemonRunning: Bool = false
     var lastDaemonHeartbeat: Date?
@@ -115,6 +118,7 @@ final class WillpowerViewModel {
     /// Local storage keys for global daily reset time
     private let localDailyResetHourKey = "willpower.local.dailyResetHour"
     private let localDailyResetMinuteKey = "willpower.local.dailyResetMinute"
+    private let localUse24HourTimeKey = "willpower.local.use24HourTime"
 
     /// Tracks blocklist IDs with pending optimistic blocks (not yet confirmed by daemon)
     /// Used to prevent syncState() from overwriting optimistic updates before daemon processes them
@@ -169,6 +173,9 @@ final class WillpowerViewModel {
             dailyResetHour = defaults.integer(forKey: localDailyResetHourKey)
             dailyResetMinute = defaults.integer(forKey: localDailyResetMinuteKey)
         }
+        if defaults.object(forKey: localUse24HourTimeKey) != nil {
+            use24HourTime = defaults.bool(forKey: localUse24HourTimeKey)
+        }
     }
 
     private func saveLocalState() {
@@ -180,6 +187,7 @@ final class WillpowerViewModel {
         }
         UserDefaults.standard.set(dailyResetHour, forKey: localDailyResetHourKey)
         UserDefaults.standard.set(dailyResetMinute, forKey: localDailyResetMinuteKey)
+        UserDefaults.standard.set(use24HourTime, forKey: localUse24HourTimeKey)
     }
 
     // MARK: - State Synchronization
@@ -640,6 +648,14 @@ final class WillpowerViewModel {
         } catch {
             logger.error("IPC daily reset time sync failed: \(error.localizedDescription)")
         }
+    }
+
+    // MARK: - Time Format
+
+    /// Update the time display format preference
+    func updateTimeFormat(use24Hour: Bool) {
+        use24HourTime = use24Hour
+        saveLocalState()
     }
 
     // MARK: - Computed Properties

@@ -160,7 +160,7 @@ struct ScheduleRowView: View {
                 if let schedule = trigger.scheduleBased {
                     ForEach(schedule.windows) { window in
                         HStack {
-                            Text(window.timeRangeDescription)
+                            Text(window.timeRangeDescription(use24Hour: viewModel.use24HourTime))
                                 .font(.subheadline)
                             Text(window.weekdaysDescription)
                                 .font(.caption)
@@ -185,21 +185,28 @@ struct ScheduleRowView: View {
 // MARK: - ScheduleWindow Extensions
 
 extension ScheduleBasedTrigger.ScheduleWindow {
-    var timeRangeDescription: String {
-        func format12Hour(_ hour: Int, _ minute: Int) -> String {
-            let isAM = hour < 12
-            var hour12 = hour % 12
-            if hour12 == 0 { hour12 = 12 }
-            let period = isAM ? "AM" : "PM"
-            if minute == 0 {
-                return "\(hour12) \(period)"
-            } else {
-                return "\(hour12):\(String(format: "%02d", minute)) \(period)"
+    func timeRangeDescription(use24Hour: Bool = false) -> String {
+        if use24Hour {
+            func format24(_ hour: Int, _ minute: Int) -> String {
+                String(format: "%02d:%02d", hour, minute)
             }
+            return "\(format24(startHour, startMinute)) - \(format24(endHour, endMinute))"
+        } else {
+            func format12Hour(_ hour: Int, _ minute: Int) -> String {
+                let isAM = hour < 12
+                var hour12 = hour % 12
+                if hour12 == 0 { hour12 = 12 }
+                let period = isAM ? "AM" : "PM"
+                if minute == 0 {
+                    return "\(hour12) \(period)"
+                } else {
+                    return "\(hour12):\(String(format: "%02d", minute)) \(period)"
+                }
+            }
+            let startTime = format12Hour(startHour, startMinute)
+            let endTime = format12Hour(endHour, endMinute)
+            return "\(startTime) - \(endTime)"
         }
-        let startTime = format12Hour(startHour, startMinute)
-        let endTime = format12Hour(endHour, endMinute)
-        return "\(startTime) - \(endTime)"
     }
 
     var weekdaysDescription: String {
