@@ -24,6 +24,20 @@ func formatDuration(_ seconds: Int) -> String {
     }
 }
 
+// MARK: - Time Formatting
+
+/// Format an hour/minute pair respecting the user's time format preference.
+/// - Returns: e.g. "14:05" (24h) or "2:05 PM" (12h)
+func formatTime(hour: Int, minute: Int, use24Hour: Bool) -> String {
+    if use24Hour {
+        return String(format: "%02d:%02d", hour, minute)
+    } else {
+        let isAM = hour < 12
+        let hour12 = hour % 12 == 0 ? 12 : hour % 12
+        return String(format: "%d:%02d %@", hour12, minute, isAM ? "AM" : "PM")
+    }
+}
+
 // MARK: - Visit Count Color
 
 /// Get a color based on the ratio of current visits to max visits

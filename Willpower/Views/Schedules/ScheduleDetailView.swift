@@ -94,67 +94,118 @@ struct ScheduleDetailView: View {
                     Section("Time Range") {
                         Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 0) {
                             GridRow {
-                                // Start time
-                                HStack(spacing: 4) {
-                                    Picker("Hour", selection: $startDisplayHour) {
-                                        ForEach(1...12, id: \.self) {
-                                            Text("\($0)").tag($0)
+                                if viewModel.use24HourTime {
+                                    // Start time — 24-hour
+                                    HStack(spacing: 4) {
+                                        Picker("Hour", selection: $startHour) {
+                                            ForEach(0...23, id: \.self) {
+                                                Text(String(format: "%02d", $0)).tag($0)
+                                            }
                                         }
-                                    }
-                                    .labelsHidden()
-                                    .frame(width: 50)
+                                        .labelsHidden()
+                                        .frame(width: 60)
 
-                                    Text(":")
-                                        .foregroundStyle(.secondary)
+                                        Text(":")
+                                            .foregroundStyle(.secondary)
 
-                                    Picker("Minute", selection: $startMinute) {
-                                        ForEach([0, 15, 30, 45], id: \.self) {
-                                            Text(String(format: "%02d", $0)).tag($0)
+                                        Picker("Minute", selection: $startMinute) {
+                                            ForEach([0, 15, 30, 45], id: \.self) {
+                                                Text(String(format: "%02d", $0)).tag($0)
+                                            }
                                         }
+                                        .labelsHidden()
+                                        .frame(width: 50)
                                     }
-                                    .labelsHidden()
-                                    .frame(width: 50)
 
-                                    Picker("AM/PM", selection: $startIsAM) {
-                                        Text("AM").tag(true)
-                                        Text("PM").tag(false)
-                                    }
-                                    .labelsHidden()
-                                    .frame(width: 55)
-                                }
+                                    // Arrow
+                                    Image(systemName: "arrow.right")
+                                        .foregroundStyle(.tertiary)
+                                        .font(.title3)
 
-                                // Arrow
-                                Image(systemName: "arrow.right")
-                                    .foregroundStyle(.tertiary)
-                                    .font(.title3)
-
-                                // End time
-                                HStack(spacing: 4) {
-                                    Picker("Hour", selection: $endDisplayHour) {
-                                        ForEach(1...12, id: \.self) {
-                                            Text("\($0)").tag($0)
+                                    // End time — 24-hour
+                                    HStack(spacing: 4) {
+                                        Picker("Hour", selection: $endHour) {
+                                            ForEach(0...23, id: \.self) {
+                                                Text(String(format: "%02d", $0)).tag($0)
+                                            }
                                         }
-                                    }
-                                    .labelsHidden()
-                                    .frame(width: 50)
+                                        .labelsHidden()
+                                        .frame(width: 60)
 
-                                    Text(":")
-                                        .foregroundStyle(.secondary)
+                                        Text(":")
+                                            .foregroundStyle(.secondary)
 
-                                    Picker("Minute", selection: $endMinute) {
-                                        ForEach([0, 15, 30, 45], id: \.self) {
-                                            Text(String(format: "%02d", $0)).tag($0)
+                                        Picker("Minute", selection: $endMinute) {
+                                            ForEach([0, 15, 30, 45], id: \.self) {
+                                                Text(String(format: "%02d", $0)).tag($0)
+                                            }
                                         }
+                                        .labelsHidden()
+                                        .frame(width: 50)
                                     }
-                                    .labelsHidden()
-                                    .frame(width: 50)
+                                } else {
+                                    // Start time — 12-hour
+                                    HStack(spacing: 4) {
+                                        Picker("Hour", selection: $startDisplayHour) {
+                                            ForEach(1...12, id: \.self) {
+                                                Text("\($0)").tag($0)
+                                            }
+                                        }
+                                        .labelsHidden()
+                                        .frame(width: 50)
 
-                                    Picker("AM/PM", selection: $endIsAM) {
-                                        Text("AM").tag(true)
-                                        Text("PM").tag(false)
+                                        Text(":")
+                                            .foregroundStyle(.secondary)
+
+                                        Picker("Minute", selection: $startMinute) {
+                                            ForEach([0, 15, 30, 45], id: \.self) {
+                                                Text(String(format: "%02d", $0)).tag($0)
+                                            }
+                                        }
+                                        .labelsHidden()
+                                        .frame(width: 50)
+
+                                        Picker("AM/PM", selection: $startIsAM) {
+                                            Text("AM").tag(true)
+                                            Text("PM").tag(false)
+                                        }
+                                        .labelsHidden()
+                                        .frame(width: 55)
                                     }
-                                    .labelsHidden()
-                                    .frame(width: 55)
+
+                                    // Arrow
+                                    Image(systemName: "arrow.right")
+                                        .foregroundStyle(.tertiary)
+                                        .font(.title3)
+
+                                    // End time — 12-hour
+                                    HStack(spacing: 4) {
+                                        Picker("Hour", selection: $endDisplayHour) {
+                                            ForEach(1...12, id: \.self) {
+                                                Text("\($0)").tag($0)
+                                            }
+                                        }
+                                        .labelsHidden()
+                                        .frame(width: 50)
+
+                                        Text(":")
+                                            .foregroundStyle(.secondary)
+
+                                        Picker("Minute", selection: $endMinute) {
+                                            ForEach([0, 15, 30, 45], id: \.self) {
+                                                Text(String(format: "%02d", $0)).tag($0)
+                                            }
+                                        }
+                                        .labelsHidden()
+                                        .frame(width: 50)
+
+                                        Picker("AM/PM", selection: $endIsAM) {
+                                            Text("AM").tag(true)
+                                            Text("PM").tag(false)
+                                        }
+                                        .labelsHidden()
+                                        .frame(width: 55)
+                                    }
                                 }
                             }
                         }
@@ -185,22 +236,28 @@ struct ScheduleDetailView: View {
                 .formStyle(.grouped)
                 .navigationTitle("Schedule")
                 .onChange(of: startDisplayHour) { _, newValue in
+                    guard !viewModel.use24HourTime else { return }
                     startHour = to24Hour(newValue, isAM: startIsAM)
                     saveIfValid()
                 }
                 .onChange(of: startIsAM) { _, newValue in
+                    guard !viewModel.use24HourTime else { return }
                     startHour = to24Hour(startDisplayHour, isAM: newValue)
                     saveIfValid()
                 }
+                .onChange(of: startHour) { _, _ in saveIfValid() }
                 .onChange(of: startMinute) { _, _ in saveIfValid() }
                 .onChange(of: endDisplayHour) { _, newValue in
+                    guard !viewModel.use24HourTime else { return }
                     endHour = to24Hour(newValue, isAM: endIsAM)
                     saveIfValid()
                 }
                 .onChange(of: endIsAM) { _, newValue in
+                    guard !viewModel.use24HourTime else { return }
                     endHour = to24Hour(endDisplayHour, isAM: newValue)
                     saveIfValid()
                 }
+                .onChange(of: endHour) { _, _ in saveIfValid() }
                 .onChange(of: endMinute) { _, _ in saveIfValid() }
                 .onChange(of: selectedWeekdays) { _, _ in saveIfValid() }
                 .alert("Delete Schedule?", isPresented: $isShowingDeleteConfirmation) {

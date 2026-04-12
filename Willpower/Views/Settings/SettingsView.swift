@@ -108,7 +108,15 @@ struct SettingsView: View {
                     setLaunchAtLogin(newValue)
                 }
 
+                Toggle(isOn: Binding(
+                    get: { viewModel.use24HourTime },
+                    set: { viewModel.updateTimeFormat(use24Hour: $0) }
+                )) {
+                    Label("Use 24-Hour Time", systemImage: "clock")
+                }
+
                 DatePicker("Daily Visit Reset", selection: $dailyResetTime, displayedComponents: .hourAndMinute)
+                    .environment(\.locale, timeLocale)
                     .onChange(of: dailyResetTime) { _, newValue in
                         let hour = Calendar.current.component(.hour, from: newValue)
                         let minute = Calendar.current.component(.minute, from: newValue)
@@ -257,6 +265,12 @@ struct SettingsView: View {
     }
 
     // MARK: - Computed Properties
+
+    private var timeLocale: Locale {
+        var components = Locale.Components(locale: .current)
+        components.hourCycle = viewModel.use24HourTime ? .zeroToTwentyThree : .oneToTwelve
+        return Locale(components: components)
+    }
 
     private var blockingStatusColor: Color {
         if viewModel.isDaemonRunning {

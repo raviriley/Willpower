@@ -74,13 +74,7 @@ struct TriggerDetailView: View {
 
     /// Formatted global daily reset time from Settings
     var globalResetTimeFormatted: String {
-        let date = Calendar.current.date(
-            bySettingHour: viewModel.dailyResetHour,
-            minute: viewModel.dailyResetMinute,
-            second: 0,
-            of: Date()
-        ) ?? Date()
-        return date.formatted(date: .omitted, time: .shortened)
+        formatTime(hour: viewModel.dailyResetHour, minute: viewModel.dailyResetMinute, use24Hour: viewModel.use24HourTime)
     }
 
     /// Formatted duration string for display

@@ -522,7 +522,7 @@ struct TriggerSummaryRow: View {
                     Text(trigger.type.displayName)
                         .font(.subheadline)
 
-                    Text(trigger.summary)
+                    Text(trigger.summary(use24Hour: viewModel.use24HourTime))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -588,7 +588,7 @@ extension TriggerType {
 // MARK: - TriggerConfig Summary
 
 extension TriggerConfig {
-    var summary: String {
+    func summary(use24Hour: Bool = false) -> String {
         switch type {
         case .timeBased:
             if let tb = timeBased {
@@ -602,7 +602,7 @@ extension TriggerConfig {
 
         case .scheduleBased:
             if let sb = scheduleBased, let window = sb.windows.first {
-                return "\(window.timeRangeDescription) \(window.weekdaysDescription)"
+                return "\(window.timeRangeDescription(use24Hour: use24Hour)) \(window.weekdaysDescription)"
             }
             return "Not configured"
 
