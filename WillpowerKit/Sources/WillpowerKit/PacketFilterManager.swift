@@ -80,6 +80,15 @@ public final class PacketFilterManager: Sendable {
         "mask.apple-dns.net"
     ]
 
+    /// IPs written to /etc/hosts when blocking — not real server addresses.
+    private static let hostsBlockPlaceholderIPs: Set<String> = [
+        "127.0.0.1", "0.0.0.0", "::1", "::"
+    ]
+
+    /// Resolvers for PF rule generation. `nil` = system default (ISP/router DNS, what
+    /// browsers use). Public resolvers are included because CDN edges vary by resolver.
+    private static let pfLookupNameservers: [String?] = [nil, "8.8.8.8", "1.1.1.1"]
+
     /// Start blocking the given domains using pf firewall
     /// - Parameter domains: Array of domain names to block
     public func startBlock(domains: [String]) throws {
@@ -238,18 +247,43 @@ public final class PacketFilterManager: Sendable {
 
     // MARK: - Private Helpers
 
-    /// Resolve a hostname to IP addresses using external DNS (bypasses hosts file)
+    /// Resolve a hostname to IP addresses from multiple DNS sources.
+    /// Unions system DNS (what browsers use) with public resolvers, since CDN edges
+    /// like Fastly return different IPs depending on the resolver.
     private func resolveHostname(_ hostname: String) -> [String] {
-        var ips: [String] = []
+        var ips = Set<String>()
 
-        // Use dig to query external DNS directly, bypassing hosts file
-        // This is critical because the hosts file may already have the domain blocked
+        for nameserver in Self.pfLookupNameservers {
+            ips.formUnion(digResolve(hostname: hostname, recordType: "A", nameserver: nameserver))
+            ips.formUnion(digResolve(hostname: hostname, recordType: "AAAA", nameserver: nameserver))
+        }
+
+        ips.subtract(Self.hostsBlockPlaceholderIPs)
+
+        let result = Array(ips)
+        if result.isEmpty {
+            logger.debug("No IPs resolved for \(hostname)")
+        } else {
+            logger.debug("Resolved \(hostname) -> \(result)")
+        }
+
+        return result
+    }
+
+    /// Query a single DNS record type via dig, optionally targeting a specific nameserver.
+    private func digResolve(hostname: String, recordType: String, nameserver: String?) -> Set<String> {
+        var ips = Set<String>()
+
         let process = Process()
         let pipe = Pipe()
 
         process.executableURL = URL(fileURLWithPath: "/usr/bin/dig")
-        // Query Google's DNS directly to bypass local hosts file
-        process.arguments = ["+short", "@8.8.8.8", hostname, "A"]
+        var arguments = ["+short"]
+        if let nameserver {
+            arguments.append("@\(nameserver)")
+        }
+        arguments.append(contentsOf: [hostname, recordType])
+        process.arguments = arguments
         process.standardOutput = pipe
         process.standardError = FileHandle.nullDevice
 
@@ -258,50 +292,23 @@ public final class PacketFilterManager: Sendable {
             process.waitUntilExit()
 
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            if let output = String(data: data, encoding: .utf8) {
-                for line in output.components(separatedBy: .newlines) {
-                    let trimmed = line.trimmingCharacters(in: .whitespaces)
-                    // Only add valid IPv4 addresses (not CNAMEs or empty lines)
-                    if !trimmed.isEmpty && trimmed.range(of: "^[0-9.]+$", options: .regularExpression) != nil {
-                        ips.append(trimmed)
+            guard let output = String(data: data, encoding: .utf8) else { return ips }
+
+            for line in output.components(separatedBy: .newlines) {
+                let trimmed = line.trimmingCharacters(in: .whitespaces)
+                guard !trimmed.isEmpty else { continue }
+
+                if recordType == "A" {
+                    if trimmed.range(of: "^[0-9.]+$", options: .regularExpression) != nil {
+                        ips.insert(trimmed)
                     }
+                } else if trimmed.contains(":") {
+                    ips.insert(trimmed)
                 }
             }
         } catch {
-            logger.debug("dig failed for \(hostname): \(error.localizedDescription)")
-        }
-
-        // Also resolve IPv6 addresses
-        let process6 = Process()
-        let pipe6 = Pipe()
-
-        process6.executableURL = URL(fileURLWithPath: "/usr/bin/dig")
-        process6.arguments = ["+short", "@8.8.8.8", hostname, "AAAA"]
-        process6.standardOutput = pipe6
-        process6.standardError = FileHandle.nullDevice
-
-        do {
-            try process6.run()
-            process6.waitUntilExit()
-
-            let data = pipe6.fileHandleForReading.readDataToEndOfFile()
-            if let output = String(data: data, encoding: .utf8) {
-                for line in output.components(separatedBy: .newlines) {
-                    let trimmed = line.trimmingCharacters(in: .whitespaces)
-                    // Only add valid IPv6 addresses
-                    if !trimmed.isEmpty && trimmed.contains(":") {
-                        ips.append(trimmed)
-                    }
-                }
-            }
-        } catch {
-            logger.debug("dig AAAA failed for \(hostname): \(error.localizedDescription)")
-        }
-
-        if ips.isEmpty {
-            logger.debug("No IPs resolved for \(hostname)")
-        } else {
-            logger.debug("Resolved \(hostname) -> \(ips)")
+            let via = nameserver ?? "system"
+            logger.debug("dig \(recordType) via \(via) failed for \(hostname): \(error.localizedDescription)")
         }
 
         return ips
