@@ -345,7 +345,16 @@ struct AllowlistDetailView: View {
                             }
                         }
                     } header: {
-                        Text("Allowed Domains (\(domains.count))")
+                        HStack {
+                            Text("Allowed Domains (\(domains.count))")
+                            Spacer()
+                            BulkSitesMenu(
+                                domains: domains,
+                                listName: name,
+                                isAddDisabled: false,
+                                onAdd: addDomains
+                            )
+                        }
                     } footer: {
                         Text("Only these domains will be accessible. All other websites will be blocked.")
                             .foregroundStyle(.secondary)
@@ -426,6 +435,15 @@ struct AllowlistDetailView: View {
 
         domains.append(cleaned)
         newDomain = ""
+        domainValidationError = nil
+        saveIfValid()
+    }
+
+    /// Append domains from a bulk paste or file import; already cleaned,
+    /// validated and de-duplicated against the list before they reach here.
+    private func addDomains(_ incoming: [String]) {
+        guard !incoming.isEmpty else { return }
+        domains.append(contentsOf: incoming)
         domainValidationError = nil
         saveIfValid()
     }

@@ -21,6 +21,10 @@ let package = Package(
         .target(
             name: "WillpowerKit"
         ),
+        .testTarget(
+            name: "WillpowerKitTests",
+            dependencies: ["WillpowerKit"]
+        ),
 
     ]
 )

@@ -349,7 +349,16 @@ struct BlocklistDetailView: View {
                             }
                         }
                     } header: {
-                        Text("Blocked Domains (\(domains.count))")
+                        HStack {
+                            Text("Blocked Domains (\(domains.count))")
+                            Spacer()
+                            BulkSitesMenu(
+                                domains: domains,
+                                listName: name,
+                                isAddDisabled: false,
+                                onAdd: addDomains
+                            )
+                        }
                     } footer: {
                         if isBlocklistActive {
                             Text("New domains will be blocked immediately.")
@@ -436,6 +445,16 @@ struct BlocklistDetailView: View {
 
         domains.append(cleaned)
         newDomain = ""
+        domainValidationError = nil
+        saveIfValid()
+    }
+
+    /// Append domains from a bulk paste or file import.
+    /// They're already cleaned, validated and de-duplicated against the list by
+    /// the time they get here, so this just commits them.
+    private func addDomains(_ incoming: [String]) {
+        guard !incoming.isEmpty else { return }
+        domains.append(contentsOf: incoming)
         domainValidationError = nil
         saveIfValid()
     }
