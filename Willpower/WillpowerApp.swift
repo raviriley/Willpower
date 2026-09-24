@@ -39,6 +39,17 @@ struct WillpowerApp: App {
                     } else if !daemonManager.isEnabled {
                         // Returning user but daemon needs setup: show daemon setup only
                         showDaemonSetup = true
+                    } else {
+                        // SMAppService can report .enabled from a registration
+                        // record that outlived the app which earned it, leaving
+                        // the helper approved-but-dead. Give the heartbeat a
+                        // moment to arrive, then trust it over the record.
+                        Task {
+                            try? await Task.sleep(for: .seconds(20))
+                            if daemonManager.hasStaleRegistration(daemonIsAlive: viewModel.isDaemonRunning) {
+                                showDaemonSetup = true
+                            }
+                        }
                     }
                 }
                 // NOTE: Removed .onDisappear { viewModel.stopStateSync() }

@@ -49,6 +49,21 @@ final class DaemonManager {
         status == .notRegistered || status == .notFound
     }
 
+    /// True when SMAppService reports the daemon as enabled but it is not
+    /// actually alive.
+    ///
+    /// `status` reflects a launchd *registration record*, not a running
+    /// process. That record can outlive the app that earned it -- replace or
+    /// remove the app, or boot the job out, and the approval frequently
+    /// survives. The app then believes setup is complete and never offers to
+    /// reinstall, while nothing is enforcing blocks.
+    ///
+    /// Callers pass the heartbeat-derived liveness so the two notions of
+    /// "healthy" are compared in one place rather than drifting apart.
+    func hasStaleRegistration(daemonIsAlive: Bool) -> Bool {
+        status == .enabled && !daemonIsAlive
+    }
+
     /// Human-readable status description
     var statusDescription: String {
         switch status {

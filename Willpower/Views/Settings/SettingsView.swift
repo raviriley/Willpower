@@ -43,7 +43,9 @@ struct SettingsView: View {
 
                 if !viewModel.isDaemonRunning {
                     HStack {
-                        Text("The daemon is not running. Website blocking is inactive.")
+                        Text(daemonManager.hasStaleRegistration(daemonIsAlive: viewModel.isDaemonRunning)
+                             ? "The background helper is registered but not running, so nothing is being blocked. Reinstall to repair it."
+                             : "The background helper is not running. Website blocking is inactive.")
                             .font(.callout)
                             .foregroundStyle(.secondary)
                         Spacer()

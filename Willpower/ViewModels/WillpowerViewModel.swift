@@ -443,7 +443,11 @@ final class WillpowerViewModel {
     /// Activate a blocklist for a duration
     func activateBlocklist(_ blocklist: BlocklistConfig, durationSeconds: Int, isLocked: Bool = true) {
         guard isDaemonRunning else {
-            errorMessage = "Cannot activate blocklist: Daemon is not running. Start the daemon with sudo first."
+            // Deliberately does not mention sudo: the supported install path is
+            // SMAppService, which asks for approval in Login Items rather than a
+            // password. Telling users to run it by hand sends them down a
+            // developer-only workaround.
+            errorMessage = "Cannot activate blocklist: the background helper isn't running. Open Settings and choose Reinstall, then approve Willpower in System Settings > General > Login Items."
             return
         }
 
@@ -485,7 +489,7 @@ final class WillpowerViewModel {
     /// Deactivate a blocklist (will fail if locked)
     func deactivateBlocklist(_ blocklist: BlocklistConfig) {
         guard isDaemonRunning else {
-            errorMessage = "Cannot deactivate blocklist: Daemon is not running"
+            errorMessage = "Cannot deactivate blocklist: the background helper isn't running. Open Settings and choose Reinstall to restore it."
             return
         }
 
