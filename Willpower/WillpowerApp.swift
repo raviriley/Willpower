@@ -108,6 +108,7 @@ struct WindowAccessor: NSViewRepresentable {
         let view = NSView()
         DispatchQueue.main.async {
             if let window = view.window {
+                window.isRestorable = false
                 window.delegate = context.coordinator
                 // Notify AppDelegate that window is visible
                 appDelegate.windowDidBecomeVisible(window)

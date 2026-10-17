@@ -89,7 +89,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        // When user clicks dock icon or opens app again, show the window
+        // Let SwiftUI create its singleton if no content view has been mounted yet.
+        if !flag && mainWindow == nil && findMainContentWindow() == nil && openMainWindow == nil {
+            return true
+        }
         if !flag {
             showMainWindow()
         }
