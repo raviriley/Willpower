@@ -288,6 +288,7 @@ final class WillpowerViewModel {
         // Check daemon status
         isDaemonRunning = ipcManager.isDaemonAlive(threshold: 15.0)
         lastDaemonHeartbeat = ipcManager.lastDaemonHeartbeat()
+        daemonManager?.checkHealth(isAlive: isDaemonRunning)
 
         // Only sync FROM daemon if it's actually running
         if isDaemonRunning {

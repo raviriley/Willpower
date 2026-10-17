@@ -155,3 +155,28 @@ cd WillpowerKit && swift test
 - [ ] Test overnight schedule windows (e.g., 22:00-05:00)
 - [ ] Test visit-count threshold activation
 - [ ] Test daemon restart recovery
+
+
+## Daemon reliability verification
+
+`swift test --package-path WillpowerKit` covers missing executables, nonzero exits,
+command timeouts, and output larger than a pipe buffer. System commands have a
+five-second deadline (two seconds for each DNS cache command). Firewall DNS work
+runs separately from the five-second schedule/heartbeat loop.
+
+For a signed build installed at its permanent location, check:
+
+- Reinstall once while online and once while offline. The spinner should remain
+  until a new heartbeat arrives, approval is required, or a specific error appears.
+- Disable background approval, then retry. The app should direct you to Login Items.
+- Sleep/wake and temporarily disconnect the network with schedules active. Hosts
+  blocking and heartbeat should continue independently of firewall DNS resolution.
+- Stop the daemon and let launchd restart it. If an approved service stays offline,
+  the app attempts repair after 60 seconds, at most once per five minutes.
+- Close the window, reopen from Dock and menu bar, and repeat quickly. Only one
+  main window should appear.
+
+The unsigned build and package tests cannot verify privileged service registration
+or System Settings approval. Install a signed app and reinstall its background
+service once to load these daemon changes; building alone does not replace the
+running service.

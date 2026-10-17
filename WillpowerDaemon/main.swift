@@ -5,7 +5,6 @@ import WillpowerKit
 
 private let daemonVersion = "1.0.11"
 private let runLoopInterval: TimeInterval = 5.0
-private let heartbeatInterval: TimeInterval = 5.0
 
 // MARK: - Logging
 
@@ -64,14 +63,13 @@ if !fm.fileExists(atPath: ipcDir) {
 
 // Initialize components
 let hostsManager = HostsManager()
-let packetFilterManager = PacketFilterManager()
+let firewallWorker = FirewallWorker()
 let ipcManager = IPCManager(role: .daemon)  // Use daemon role for tighter permissions
 let triggerEvaluator = TriggerEvaluator()
 
 /// Track previous blocked/allowed domains to detect changes (must be before dispatchMain)
 /// nil = never synced (force initial sync), empty = synced with no domains
 var previousBlockedDomains: Set<String>?
-var previousAllowedDomains: Set<String>?
 
 // NOTE: BrowserMonitor runs in the app, not the daemon.
 // The daemon runs as root and doesn't have access to user's GUI session
@@ -94,16 +92,9 @@ Task {
     log.info("Initialized. Entering run loop...")
 
     // Main run loop
-    var lastHeartbeat = Date()
 
     while true {
-        let now = Date()
-
-        // Update heartbeat periodically
-        if now.timeIntervalSince(lastHeartbeat) >= heartbeatInterval {
-            ipcManager.updateDaemonHeartbeat()
-            lastHeartbeat = now
-        }
+        ipcManager.updateDaemonHeartbeat()
 
         // Process pending commands from app (includes visit reports)
         // Isolated so failures (e.g. undecodable commands) don't block daily resets or trigger evaluation
@@ -136,7 +127,7 @@ Task {
             try applyBlocks(
                 state: state,
                 hostsManager: hostsManager,
-                packetFilterManager: packetFilterManager
+                firewallWorker: firewallWorker
             )
 
             // Save state (backup only when config changed to preserve blocklist/trigger data)
@@ -629,7 +620,7 @@ func cleanupExpiredBlocks(state: WillpowerState) -> WillpowerState {
 func applyBlocks(
     state: WillpowerState,
     hostsManager: HostsManager,
-    packetFilterManager: PacketFilterManager
+    firewallWorker: FirewallWorker
 ) throws {
     // Collect blocked domains (from .block mode active blocks)
     var blockedDomains = Set<String>()
@@ -651,51 +642,50 @@ func applyBlocks(
     // Block wins: remove blocked domains from allowed set
     allowedDomains.subtract(blockedDomains)
 
-    // Check if anything changed (nil = never synced, always sync on first run)
-    if let prevBlocked = previousBlockedDomains,
-       let prevAllowed = previousAllowedDomains,
-       blockedDomains == prevBlocked && allowedDomains == prevAllowed {
-        return  // No change, skip updates
-    }
+    // DNS resolution and PF work must not stall schedules, visits or heartbeat.
+    firewallWorker.submit(blocked: blockedDomains, allowed: allowedDomains,
+                          allowListActive: isAllowListActive)
 
-    log.info("Block state changed. Blocking \(blockedDomains.count) domain(s), allowing \(allowedDomains.count) domain(s), allowList=\(isAllowListActive)")
-
-    // Track success of each layer so we can retry on next iteration if either fails
-    var allLayersSucceeded = true
-
-    // LAYER 1: Hosts file blocking (block-mode domains only — allow list handled by PF)
-    do {
+    if previousBlockedDomains != blockedDomains {
         try hostsManager.applyBlocklistAndFlush(domains: Array(blockedDomains))
-        log.info("Layer 1: Hosts file updated")
-    } catch HostsManager.HostsError.permissionDenied {
-        log.error("Layer 1: Hosts file - permission denied (not running as root)")
-        allLayersSucceeded = false
-    } catch {
-        log.error("Layer 1: Hosts file error - \(error)")
-        allLayersSucceeded = false
-    }
-
-    // LAYER 2: PF firewall (unified rules for both block and allow modes)
-    do {
-        try packetFilterManager.applyRules(
-            blockedDomains: Array(blockedDomains),
-            allowedDomains: Array(allowedDomains),
-            isAllowListActive: isAllowListActive
-        )
-        log.info("Layer 2: PF firewall rules applied")
-    } catch PacketFilterManager.PFError.permissionDenied {
-        log.error("Layer 2: PF firewall - permission denied (not running as root)")
-        allLayersSucceeded = false
-    } catch {
-        log.error("Layer 2: PF firewall error - \(error)")
-        allLayersSucceeded = false
-    }
-
-    // Only update tracking if both layers succeeded.
-    // If either failed, leave tracking stale so the next iteration
-    // re-enters this function and retries both layers.
-    if allLayersSucceeded {
         previousBlockedDomains = blockedDomains
-        previousAllowedDomains = allowedDomains
+    }
+}
+
+/// One firewall update at a time; the next loop submits the latest state.
+/// The lock protects admission; all manager/cache access stays on the worker queue.
+final class FirewallWorker: @unchecked Sendable {
+    private let queue = DispatchQueue(label: "Willpower.firewall", qos: .utility)
+    private let lock = NSLock()
+    private var busy = false
+    private let manager = PacketFilterManager()
+    private var previousBlocked: Set<String>?
+    private var previousAllowed: Set<String>?
+    private var previousAllowListActive: Bool?
+
+    func submit(blocked: Set<String>, allowed: Set<String>, allowListActive: Bool) {
+        lock.lock()
+        guard !busy else { lock.unlock(); return }
+        busy = true
+        lock.unlock()
+        queue.async { [self] in
+            defer {
+                lock.lock()
+                busy = false
+                lock.unlock()
+            }
+            guard blocked != previousBlocked || allowed != previousAllowed ||
+                  allowListActive != previousAllowListActive else { return }
+            do {
+                try manager.applyRules(blockedDomains: Array(blocked),
+                                       allowedDomains: Array(allowed),
+                                       isAllowListActive: allowListActive)
+                previousBlocked = blocked
+                previousAllowed = allowed
+                previousAllowListActive = allowListActive
+            } catch {
+                log.error("Firewall update failed; will retry: \(error)")
+            }
+        }
     }
 }

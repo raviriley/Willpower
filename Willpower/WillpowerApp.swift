@@ -22,15 +22,15 @@ struct WillpowerApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {
-        WindowGroup {
+        Window("Willpower", id: "main") {
             ContentView(viewModel: viewModel)
                 .environment(daemonManager)
                 .environment(updaterController)
                 .background(WindowAccessor(appDelegate: appDelegate))
                 .onAppear {
                     // Configure AppDelegate with our viewModel
-                    appDelegate.configure(with: viewModel)
                     viewModel.daemonManager = daemonManager
+                    appDelegate.configure(with: viewModel)
                     daemonManager.refreshStatus()
 
                     if !hasCompletedOnboarding {
@@ -101,8 +101,10 @@ struct WillpowerApp: App {
 /// Allows AppDelegate to receive window lifecycle events
 struct WindowAccessor: NSViewRepresentable {
     let appDelegate: AppDelegate
+    @Environment(\.openWindow) private var openWindow
 
     func makeNSView(context: Context) -> NSView {
+        appDelegate.openMainWindow = { openWindow(id: "main") }
         let view = NSView()
         DispatchQueue.main.async {
             if let window = view.window {

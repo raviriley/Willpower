@@ -43,7 +43,7 @@ struct SettingsView: View {
 
                 if !viewModel.isDaemonRunning {
                     HStack {
-                        Text("The daemon is not running. Website blocking is inactive.")
+                        Text("The daemon is not responding. Existing blocks may still be active.")
                             .font(.callout)
                             .foregroundStyle(.secondary)
                         Spacer()
