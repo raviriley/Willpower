@@ -8,6 +8,7 @@
 
 import Foundation
 import ServiceManagement
+import WillpowerKit
 import AppKit
 import os.log
 
@@ -39,7 +40,7 @@ final class DaemonManager {
         status == .requiresApproval
     }
 
-    /// True if daemon is fully enabled and running
+    /// True if the daemon is registered and approved (heartbeat confirms liveness)
     var isEnabled: Bool {
         status == .enabled
     }
@@ -55,7 +56,7 @@ final class DaemonManager {
         case .notRegistered:
             return "Not Installed"
         case .enabled:
-            return "Running"
+            return "Registered"
         case .requiresApproval:
             return "Needs Approval"
         case .notFound:
@@ -109,16 +110,12 @@ final class DaemonManager {
         let service = SMAppService.daemon(plistName: Self.plistName)
         status = service.status
         logger.info("Daemon status: \(self.statusDescription) (raw: \(String(describing: self.status)))")
-
-        // Clear any previous error if daemon is now successfully running
-        if status == .enabled {
-            lastError = nil
-        }
     }
 
     /// Register the daemon with launchd
     /// After registration, user must enable in System Settings
     func register() {
+        guard !isReinstalling else { return }
         lastError = nil
         logger.info("Attempting to register daemon...")
 
@@ -164,45 +161,93 @@ final class DaemonManager {
         guard !isReinstalling else { return }
         lastError = nil
         isReinstalling = true
+        lastRecoveryAttempt = Date()
         logger.info("Reinstalling daemon (unregister + re-register)...")
 
-        let service = SMAppService.daemon(plistName: Self.plistName)
-
-        // Step 1: Unregister first (best-effort — may not be registered)
-        do {
-            try service.unregister()
-            logger.info("Daemon unregistered for reinstall")
-        } catch {
-            logger.warning("Unregister failed (may not be registered): \(error.localizedDescription)")
-        }
-
-        // Step 2: Register
-        do {
-            try service.register()
-            logger.info("Daemon re-registered successfully")
-            isReinstalling = false
-            refreshStatus()
-        } catch {
-            logger.warning("First register attempt failed: \(error.localizedDescription), retrying...")
-            // Retry once after a brief delay to let launchd finish cleanup
-            Task { @MainActor in
-                try? await Task.sleep(for: .milliseconds(500))
-                do {
-                    try service.register()
-                    logger.info("Daemon re-registered on retry")
-                    self.lastError = nil
-                } catch {
-                    logger.error("Daemon re-registration failed: \(error.localizedDescription)")
-                    self.lastError = error.localizedDescription
+        Task { @MainActor in
+            defer {
+                isReinstalling = false
+                refreshStatus()
+            }
+            let service = SMAppService.daemon(plistName: Self.plistName)
+            do {
+                // Wait for launchd to finish removing the old job before registering.
+                if service.status != .notRegistered && service.status != .notFound {
+                    try await service.unregister()
                 }
-                self.isReinstalling = false
-                self.refreshStatus()
+                var registrationError: Error?
+                for attempt in 0..<4 {
+                    do {
+                        try service.register()
+                        registrationError = nil
+                        break
+                    } catch {
+                        registrationError = error
+                        if attempt < 3 {
+                            try await Task.sleep(for: .seconds(attempt + 1))
+                        }
+                    }
+                }
+                if let registrationError { throw registrationError }
+                refreshStatus()
+                if needsApproval {
+                    lastError = "Enable Willpower in System Settings > General > Login Items, then refresh status."
+                    openSystemSettings()
+                    return
+                }
+
+                // Registration alone does not prove that the new daemon started.
+                let ipc = IPCManager()
+                let previousHeartbeat = ipc.lastDaemonHeartbeat()
+                for _ in 0..<30 {
+                    try await Task.sleep(for: .seconds(1))
+                    if ipc.isDaemonAlive(), let heartbeat = ipc.lastDaemonHeartbeat(),
+                       heartbeat > (previousHeartbeat ?? .distantPast) {
+                        lastError = nil
+                        return
+                    }
+                }
+                lastError = "The daemon is registered but did not respond within 30 seconds. Check that Willpower is allowed in System Settings > General > Login Items."
+            } catch {
+                logger.error("Daemon reinstall failed: \(error.localizedDescription)")
+                refreshStatus()
+                if needsApproval {
+                    lastError = "Enable Willpower in System Settings > General > Login Items, then refresh status."
+                    openSystemSettings()
+                } else {
+                    lastError = error.localizedDescription
+                }
             }
         }
     }
 
+    /// Give launchd time to restart after a crash or wake before attempting repair.
+    private var offlineSince: Date?
+    private var lastRecoveryAttempt: Date?
+
+    func checkHealth(isAlive: Bool) {
+        if isAlive {
+            offlineSince = nil
+            return
+        }
+        let now = Date()
+        guard let offlineSince else {
+            self.offlineSince = now
+            return
+        }
+        guard now.timeIntervalSince(offlineSince) >= 60,
+              !isReinstalling,
+              lastRecoveryAttempt.map({ now.timeIntervalSince($0) >= 300 }) ?? true else { return }
+        refreshStatus()
+        // Never automatically register a service that the user disabled or removed.
+        guard status == .enabled else { return }
+        lastRecoveryAttempt = now
+        reinstall()
+    }
+
     /// Unregister the daemon from launchd
     func unregister() {
+        guard !isReinstalling else { return }
         lastError = nil
         logger.info("Attempting to unregister daemon...")
 

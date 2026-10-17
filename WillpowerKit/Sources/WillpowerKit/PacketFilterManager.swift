@@ -223,10 +223,7 @@ public final class PacketFilterManager: Sendable {
         process.standardError = FileHandle.nullDevice
 
         do {
-            try process.run()
-            process.waitUntilExit()
-
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            let data = try process.runWithTimeout()
             let output = String(data: data, encoding: .utf8) ?? ""
 
             // If there are rules in the anchor, blocking is active
@@ -249,15 +246,12 @@ public final class PacketFilterManager: Sendable {
 
         process.executableURL = URL(fileURLWithPath: "/usr/bin/dig")
         // Query Google's DNS directly to bypass local hosts file
-        process.arguments = ["+short", "@8.8.8.8", hostname, "A"]
+        process.arguments = ["+short", "+time=1", "+tries=1", "@8.8.8.8", hostname, "A"]
         process.standardOutput = pipe
         process.standardError = FileHandle.nullDevice
 
         do {
-            try process.run()
-            process.waitUntilExit()
-
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            let data = try process.runWithTimeout()
             if let output = String(data: data, encoding: .utf8) {
                 for line in output.components(separatedBy: .newlines) {
                     let trimmed = line.trimmingCharacters(in: .whitespaces)
@@ -276,15 +270,12 @@ public final class PacketFilterManager: Sendable {
         let pipe6 = Pipe()
 
         process6.executableURL = URL(fileURLWithPath: "/usr/bin/dig")
-        process6.arguments = ["+short", "@8.8.8.8", hostname, "AAAA"]
+        process6.arguments = ["+short", "+time=1", "+tries=1", "@8.8.8.8", hostname, "AAAA"]
         process6.standardOutput = pipe6
         process6.standardError = FileHandle.nullDevice
 
         do {
-            try process6.run()
-            process6.waitUntilExit()
-
-            let data = pipe6.fileHandleForReading.readDataToEndOfFile()
+            let data = try process6.runWithTimeout()
             if let output = String(data: data, encoding: .utf8) {
                 for line in output.components(separatedBy: .newlines) {
                     let trimmed = line.trimmingCharacters(in: .whitespaces)
@@ -427,8 +418,7 @@ public final class PacketFilterManager: Sendable {
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
 
-        try process.run()
-        process.waitUntilExit()
+        try process.runWithTimeout()
 
         logger.info("pf enabled and rules loaded (pfctl -E -f -F states)")
     }
@@ -441,8 +431,7 @@ public final class PacketFilterManager: Sendable {
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
 
-        try process.run()
-        process.waitUntilExit()
+        try process.runWithTimeout()
 
         // Also flush states to break existing connections
         let flushProcess = Process()
@@ -451,8 +440,7 @@ public final class PacketFilterManager: Sendable {
         flushProcess.standardOutput = FileHandle.nullDevice
         flushProcess.standardError = FileHandle.nullDevice
 
-        try? flushProcess.run()
-        flushProcess.waitUntilExit()
+        try flushProcess.runWithTimeout()
     }
 }
 

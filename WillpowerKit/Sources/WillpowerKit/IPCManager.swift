@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import Darwin
 import os.log
 
 private let logger = WillpowerLogger.ipc
@@ -86,6 +87,17 @@ public final class IPCManager: @unchecked Sendable {
 
         // Ensure IPC directory exists
         ensureIPCDirectory()
+        // Repair permissions from older installations even when directories exist.
+        if role == .daemon {
+            for (path, mode) in [("/Library/Application Support/Willpower", 0o750), (Self.ipcDirectory, 0o770)] {
+                do {
+                    try fileManager.setAttributes([.posixPermissions: mode,
+                                                   .groupOwnerAccountID: Self.adminGroupID], ofItemAtPath: path)
+                } catch {
+                    logger.error("Cannot repair IPC permissions: \(error.localizedDescription)")
+                }
+            }
+        }
     }
 
     /// Ensure the IPC directory exists with appropriate permissions
@@ -119,6 +131,19 @@ public final class IPCManager: @unchecked Sendable {
         }
     }
 
+    /// Publish only after permissions are ready, so readers never see a root-only file.
+    private func publish(_ data: Data, to path: String, permissions: Int) throws {
+        let temporaryPath = Self.ipcDirectory + "/." + UUID().uuidString
+        defer { try? fileManager.removeItem(atPath: temporaryPath) }
+        try data.write(to: URL(fileURLWithPath: temporaryPath), options: .withoutOverwriting)
+        var attributes: [FileAttributeKey: Any] = [.posixPermissions: permissions]
+        if role == .daemon { attributes[.groupOwnerAccountID] = Self.adminGroupID }
+        try fileManager.setAttributes(attributes, ofItemAtPath: temporaryPath)
+        guard rename(temporaryPath, path) == 0 else {
+            throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+        }
+    }
+
     // MARK: - State Management
 
     /// Save the current Willpower state (typically called by daemon)
@@ -137,7 +162,7 @@ public final class IPCManager: @unchecked Sendable {
         }
 
         let url = URL(fileURLWithPath: Self.stateFile)
-        try data.write(to: url, options: .atomic)
+        try publish(data, to: url.path, permissions: url.path == Self.commandsFile ? 0o660 : 0o640)
         // 0o640: owner (root) rw-, group (admin) r--, others ---
         // Daemon writes, app (in admin group) reads
         try? fileManager.setAttributes([.posixPermissions: 0o640], ofItemAtPath: Self.stateFile)
@@ -182,7 +207,7 @@ public final class IPCManager: @unchecked Sendable {
             if let backupState = try? loadStateFromFile(Self.stateBackupFile) {
                 logger.info("Successfully recovered state from backup")
                 // Restore backup to main file
-                try? restoreFromBackup()
+                if role == .daemon { try? restoreFromBackup() }
                 return backupState
             }
             logger.error("Backup file also corrupted, state recovery failed")
@@ -232,8 +257,31 @@ public final class IPCManager: @unchecked Sendable {
 
     // MARK: - Commands (App -> Daemon)
 
+    /// Lock a stable file, since atomic replacement changes commands.json's inode.
+    private func lockCommands() throws -> Int32 {
+        let fd = open(Self.ipcDirectory + "/commands.lock", O_CREAT | O_RDWR, 0o660)
+        guard fd >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+        if role == .daemon {
+            _ = fchown(fd, 0, Self.adminGroupID)
+            _ = fchmod(fd, 0o660)
+        }
+        guard flock(fd, LOCK_EX) == 0 else {
+            let error = POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+            close(fd)
+            throw error
+        }
+        return fd
+    }
+
+    private func unlockCommands(_ fd: Int32) {
+        _ = flock(fd, LOCK_UN)
+        close(fd)
+    }
+
     /// Queue a command for the daemon to process
     public func queueCommand(_ command: DaemonCommand) throws {
+        let fd = try lockCommands()
+        defer { unlockCommands(fd) }
         // Load existing commands
         var commands = (try? loadPendingCommands()) ?? []
 
@@ -270,7 +318,7 @@ public final class IPCManager: @unchecked Sendable {
         let data = try encoder.encode(commands)
         ensureIPCDirectory()
         let url = URL(fileURLWithPath: Self.commandsFile)
-        try data.write(to: url, options: .atomic)
+        try publish(data, to: url.path, permissions: url.path == Self.commandsFile ? 0o660 : 0o640)
         // 0o660: owner (root) rw-, group (admin) rw-, others ---
         // Both daemon and app (in admin group) need read/write
         try? fileManager.setAttributes([.posixPermissions: 0o660], ofItemAtPath: Self.commandsFile)
@@ -291,11 +339,15 @@ public final class IPCManager: @unchecked Sendable {
 
     /// Clear all pending commands (called by daemon after processing)
     public func clearPendingCommands() throws {
+        let fd = try lockCommands()
+        defer { unlockCommands(fd) }
         try? fileManager.removeItem(atPath: Self.commandsFile)
     }
 
     /// Mark a specific command as processed by removing it
     public func markCommandProcessed(_ commandId: UUID) throws {
+        let fd = try lockCommands()
+        defer { unlockCommands(fd) }
         var commands = try loadPendingCommands()
         commands.removeAll { $0.id == commandId }
 
@@ -304,7 +356,7 @@ public final class IPCManager: @unchecked Sendable {
         } else {
             let data = try encoder.encode(commands)
             let url = URL(fileURLWithPath: Self.commandsFile)
-            try data.write(to: url, options: .atomic)
+            try publish(data, to: url.path, permissions: url.path == Self.commandsFile ? 0o660 : 0o640)
             // 0o660 permissions
             try? fileManager.setAttributes([.posixPermissions: 0o660], ofItemAtPath: Self.commandsFile)
             if role == .daemon {
@@ -321,7 +373,11 @@ public final class IPCManager: @unchecked Sendable {
 
         ensureIPCDirectory()
         let timestampString = String(timestamp)
-        try? timestampString.write(toFile: Self.heartbeatFile, atomically: true, encoding: .utf8)
+        do {
+            try publish(Data(timestampString.utf8), to: Self.heartbeatFile, permissions: 0o640)
+        } catch {
+            logger.error("Cannot write heartbeat: \(error.localizedDescription)")
+        }
         // 0o640: owner (root) rw-, group (admin) r--, others ---
         // Daemon writes, app (in admin group) reads
         try? fileManager.setAttributes([.posixPermissions: 0o640], ofItemAtPath: Self.heartbeatFile)

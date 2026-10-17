@@ -112,40 +112,15 @@ public final class HostsManager: Sendable {
     /// This ensures changes take effect immediately
     /// Note: This flushes system DNS cache but browsers may have their own caches
     public func flushDNSCache() throws {
-        // Flush the system DNS cache
-        let dscacheutil = Process()
-        dscacheutil.executableURL = URL(fileURLWithPath: "/usr/bin/dscacheutil")
-        dscacheutil.arguments = ["-flushcache"]
-        try dscacheutil.run()
-        dscacheutil.waitUntilExit()
+        let flush = Process()
+        flush.executableURL = URL(fileURLWithPath: "/usr/bin/dscacheutil")
+        flush.arguments = ["-flushcache"]
+        try flush.runWithTimeout(2)
 
-        // Signal mDNSResponder to reload (primary DNS resolver on macOS)
-        let killallMDNS = Process()
-        killallMDNS.executableURL = URL(fileURLWithPath: "/usr/bin/killall")
-        killallMDNS.arguments = ["-HUP", "mDNSResponder"]
-        try? killallMDNS.run()
-        killallMDNS.waitUntilExit()
-
-        // Also restart mDNSResponderHelper if it exists (helps with some macOS versions)
-        let killallHelper = Process()
-        killallHelper.executableURL = URL(fileURLWithPath: "/usr/bin/killall")
-        killallHelper.arguments = ["-HUP", "mDNSResponderHelper"]
-        try? killallHelper.run()
-        killallHelper.waitUntilExit()
-
-        // Flush the DNS service discovery daemon
-        let discoveryKill = Process()
-        discoveryKill.executableURL = URL(fileURLWithPath: "/usr/bin/killall")
-        discoveryKill.arguments = ["-HUP", "discoveryd"]
-        try? discoveryKill.run()  // Only exists on older macOS
-        discoveryKill.waitUntilExit()
-
-        // Use lookupd flush for older compatibility
-        let lookupdFlush = Process()
-        lookupdFlush.executableURL = URL(fileURLWithPath: "/usr/sbin/lookupd")
-        lookupdFlush.arguments = ["-flushcache"]
-        try? lookupdFlush.run()  // Only exists on very old macOS
-        lookupdFlush.waitUntilExit()
+        let reload = Process()
+        reload.executableURL = URL(fileURLWithPath: "/usr/bin/killall")
+        reload.arguments = ["-HUP", "mDNSResponder"]
+        try reload.runWithTimeout(2)
 
         logger.info("DNS cache flushed")
     }

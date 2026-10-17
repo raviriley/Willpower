@@ -21,6 +21,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusMenu: NSMenu?
     private var viewModel: WillpowerViewModel?
     private var mainWindow: NSWindow?
+    var openMainWindow: (() -> Void)?
     private var isWindowVisible = false
     private var iconUpdateTimer: Timer?
     private lazy var logoIcon: NSImage = createLogoIcon()
@@ -88,11 +89,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        // When user clicks dock icon or opens app again, show the window
+        // Let SwiftUI create its singleton if no content view has been mounted yet.
+        if !flag && mainWindow == nil && findMainContentWindow() == nil && openMainWindow == nil {
+            return true
+        }
         if !flag {
             showMainWindow()
         }
-        return true
+        return false // This delegate handled reopening; do not also ask SwiftUI.
     }
 
     // MARK: - Launch Detection
@@ -364,11 +368,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Request SwiftUI to create a new window
     private func requestNewWindow() {
-        // Try standard AppKit mechanism to trigger window creation
-        // This triggers the "New Window" menu action in SwiftUI apps
-        if #available(macOS 13.0, *) {
-            NSApp.sendAction(#selector(NSResponder.newWindowForTab(_:)), to: nil, from: nil)
-        }
+        openMainWindow?()
 
         // Check for window after a delay
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
